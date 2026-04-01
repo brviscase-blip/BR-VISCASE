@@ -172,31 +172,31 @@ const Contracts = () => {
     <div className="space-y-8 animate-fade-in">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-bold tracking-tight mb-2">Contratos</h1>
+          <h1 className="text-4xl font-bold tracking-tight mb-2 text-[#c11720]">Contratos</h1>
           <p className="text-zinc-500">Gerencie seus contratos ativos e acompanhe pagamentos.</p>
         </div>
         <button 
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center justify-center gap-2 bg-black text-white px-6 py-3 rounded-2xl font-bold hover:bg-zinc-800 transition-all active:scale-95 shadow-lg shadow-black/10"
+          className="flex items-center justify-center gap-2 bg-[#c11720] text-white px-6 py-3 rounded-2xl font-bold hover:bg-red-800 transition-all active:scale-95"
         >
           <Plus size={20} />
           Novo Contrato
         </button>
       </header>
 
-      <div className="bg-white rounded-3xl border border-zinc-100 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-none border border-zinc-100 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-zinc-100 flex flex-col md:flex-row gap-4">
           <div className="relative flex-1">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
             <input 
               type="text" 
               placeholder="Buscar contrato por nome..."
-              className="w-full pl-12 pr-4 py-3 bg-zinc-50 border-none rounded-xl focus:ring-2 focus:ring-black transition-all"
+              className="w-full pl-12 pr-4 py-3 bg-zinc-50 border-none rounded-2xl focus:ring-2 focus:ring-black transition-all"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <button className="flex items-center gap-2 px-6 py-3 bg-zinc-50 text-zinc-600 rounded-xl font-medium hover:bg-zinc-100 transition-all">
+          <button className="flex items-center gap-2 px-6 py-3 bg-zinc-50 text-zinc-600 rounded-2xl font-medium hover:bg-zinc-100 transition-all">
             <Filter size={18} />
             Filtros
           </button>
@@ -206,14 +206,14 @@ const Contracts = () => {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-zinc-50/50">
-                <th className="px-6 py-4 text-xs font-bold text-zinc-400 uppercase tracking-wider">Contrato</th>
-                <th className="px-6 py-4 text-xs font-bold text-zinc-400 uppercase tracking-wider">Demandas</th>
-                <th className="px-6 py-4 text-xs font-bold text-zinc-400 uppercase tracking-wider">Valor Bruto</th>
-                <th className="px-6 py-4 text-xs font-bold text-zinc-400 uppercase tracking-wider">Valor Líquido</th>
-                <th className="px-6 py-4 text-xs font-bold text-zinc-400 uppercase tracking-wider">Margem</th>
-                <th className="px-6 py-4 text-xs font-bold text-zinc-400 uppercase tracking-wider">Pagamentos</th>
-                <th className="px-6 py-4 text-xs font-bold text-zinc-400 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-xs font-bold text-zinc-400 uppercase tracking-wider text-right">Ações</th>
+                <th className="px-6 py-4 text-xs font-bold text-[#7b564d] uppercase tracking-wider">Contrato</th>
+                <th className="px-6 py-4 text-xs font-bold text-[#7b564d] uppercase tracking-wider">Demandas</th>
+                <th className="px-6 py-4 text-xs font-bold text-[#7b564d] uppercase tracking-wider">Valor Bruto</th>
+                <th className="px-6 py-4 text-xs font-bold text-[#7b564d] uppercase tracking-wider">Valor Líquido</th>
+                <th className="px-6 py-4 text-xs font-bold text-[#7b564d] uppercase tracking-wider">Receita Líquida</th>
+                <th className="px-6 py-4 text-xs font-bold text-[#7b564d] uppercase tracking-wider">Pagamentos</th>
+                <th className="px-6 py-4 text-xs font-bold text-[#7b564d] uppercase tracking-wider" style={{ paddingLeft: '29px', paddingRight: '24px' }}>Status</th>
+                <th className="px-6 py-4 text-xs font-bold text-[#7b564d] uppercase tracking-wider text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100">
@@ -240,9 +240,9 @@ const Contracts = () => {
                     onClick={() => navigate(`/contracts/${contract.id}`)}
                   >
                     <td className="px-6 py-5">
-                      <div className="font-bold text-zinc-900 group-hover:text-black">{contract.nome}</div>
-                      <div className="text-xs text-zinc-500">{contract.pacote}</div>
-                      <div className="text-[10px] text-zinc-400">Início: {format(parseISO(contract.data_inicio), 'dd/MM/yyyy')}</div>
+                      <div className="font-bold text-[#c11720] group-hover:text-red-700" style={{ fontFamily: 'Arial' }}>{contract.nome}</div>
+                      <div className="text-xs text-[#7b564d] font-bold">{contract.pacote}</div>
+                      <div className="text-[11px] text-zinc-400">Início: {format(parseISO(contract.data_inicio), 'dd/MM/yyyy')}</div>
                     </td>
                     <td className="px-6 py-5">
                       <span className="text-sm font-bold text-zinc-700">{totalDemandsCount} un.</span>
@@ -259,8 +259,8 @@ const Contracts = () => {
                     </td>
                     <td className="px-6 py-5">
                       <div className="flex flex-col">
-                        <span className="text-sm font-bold text-zinc-900">{marginPercentage.toFixed(1)}%</span>
-                        <span className="text-[10px] text-zinc-400">PERDA: {lossPercentage.toFixed(1)}%</span>
+                        <span className="text-sm font-bold text-[#c11720]">{marginPercentage.toFixed(1)}%</span>
+                        <span className="text-[11px] font-bold text-zinc-400">PERDA ACEITÁVEL: {lossPercentage.toFixed(1)}%</span>
                       </div>
                     </td>
                     <td className="px-6 py-5">
@@ -282,7 +282,7 @@ const Contracts = () => {
                       <div className="flex items-center justify-end gap-2">
                         <button 
                           onClick={() => navigate(`/contracts/${contract.id}`)}
-                          className="p-2 text-zinc-400 hover:text-black hover:bg-zinc-100 rounded-lg transition-all"
+                          className="p-2 text-zinc-400 hover:text-black hover:bg-zinc-100 rounded-xl transition-all"
                         >
                           <Eye size={18} />
                         </button>
@@ -291,7 +291,7 @@ const Contracts = () => {
                             setContractToDelete(contract);
                             setIsDeleteModalOpen(true);
                           }}
-                          className="p-2 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                          className="p-2 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
                         >
                           <Trash2 size={18} />
                         </button>
@@ -307,7 +307,7 @@ const Contracts = () => {
               <div className="w-16 h-16 bg-zinc-50 rounded-full flex items-center justify-center mx-auto mb-4 text-zinc-300">
                 <FileText size={32} />
               </div>
-              <h3 className="text-lg font-bold text-zinc-900">Nenhum contrato encontrado</h3>
+              <h3 className="text-lg font-bold text-[#c11720]">Nenhum contrato encontrado</h3>
               <p className="text-zinc-500">Comece criando seu primeiro contrato de serviço.</p>
             </div>
           )}
@@ -317,30 +317,30 @@ const Contracts = () => {
       {/* Create Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden animate-slide-up">
+          <div className="bg-white w-full max-w-2xl rounded-none shadow-2xl overflow-hidden animate-slide-up">
             <div className="p-8 border-b border-zinc-100 flex justify-between items-center">
-              <h2 className="text-2xl font-bold">Novo Contrato</h2>
-              <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-zinc-100 rounded-full transition-all">
+              <h2 className="text-2xl font-bold text-[#c11720]">Novo Contrato</h2>
+              <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-zinc-100 rounded-none transition-all">
                 <X size={24} />
               </button>
             </div>
             <form onSubmit={handleCreate} className="p-8 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-zinc-700">Nome do Contrato</label>
+                  <label className="text-sm font-bold text-[#c11720]">Nome do Contrato</label>
                   <input 
                     required
                     type="text" 
-                    className="w-full px-4 py-3 bg-zinc-50 border-none rounded-xl focus:ring-2 focus:ring-black transition-all"
+                    className="w-full px-4 py-3 bg-zinc-50 border-none rounded-2xl focus:ring-2 focus:ring-black transition-all"
                     placeholder="Ex: Mega Elétrica"
                     value={formData.nome}
                     onChange={e => setFormData({...formData, nome: e.target.value})}
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-zinc-700">Pacote</label>
+                  <label className="text-sm font-bold text-[#c11720]">Pacote</label>
                   <select 
-                    className="w-full px-4 py-3 bg-zinc-50 border-none rounded-xl focus:ring-2 focus:ring-black transition-all"
+                    className="w-full px-4 py-3 bg-zinc-50 border-none rounded-2xl focus:ring-2 focus:ring-black transition-all"
                     value={formData.pacote}
                     onChange={e => setFormData({...formData, pacote: e.target.value as Pacote})}
                   >
@@ -352,12 +352,12 @@ const Contracts = () => {
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-zinc-700">Valor Bruto (R$)</label>
+                  <label className="text-sm font-bold text-[#c11720]">Valor Bruto (R$)</label>
                   <input 
                     required
                     type="number" 
                     step="0.01"
-                    className="w-full px-4 py-3 bg-zinc-50 border-none rounded-xl focus:ring-2 focus:ring-black transition-all"
+                    className="w-full px-4 py-3 bg-zinc-50 border-none rounded-2xl focus:ring-2 focus:ring-black transition-all"
                     placeholder="0,00"
                     value={formData.valor_bruto}
                     onChange={e => {
@@ -367,29 +367,29 @@ const Contracts = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-zinc-700">Data de Início</label>
+                  <label className="text-sm font-bold text-[#c11720]">Data de Início</label>
                   <input 
                     required
                     type="date" 
-                    className="w-full px-4 py-3 bg-zinc-50 border-none rounded-xl focus:ring-2 focus:ring-black transition-all"
+                    className="w-full px-4 py-3 bg-zinc-50 border-none rounded-2xl focus:ring-2 focus:ring-black transition-all"
                     value={formData.data_inicio}
                     onChange={e => setFormData({...formData, data_inicio: e.target.value})}
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-zinc-700">Vencimento 1ª Quinzena</label>
+                  <label className="text-sm font-bold text-[#c11720]">Vencimento 1ª Quinzena</label>
                   <input 
                     type="date" 
-                    className="w-full px-4 py-3 bg-zinc-50 border-none rounded-xl focus:ring-2 focus:ring-black transition-all"
+                    className="w-full px-4 py-3 bg-zinc-50 border-none rounded-2xl focus:ring-2 focus:ring-black transition-all"
                     value={formData.data_pagamento_1q}
                     onChange={e => setFormData({...formData, data_pagamento_1q: e.target.value})}
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-zinc-700">Vencimento 2ª Quinzena</label>
+                  <label className="text-sm font-bold text-[#c11720]">Vencimento 2ª Quinzena</label>
                   <input 
                     type="date" 
-                    className="w-full px-4 py-3 bg-zinc-50 border-none rounded-xl focus:ring-2 focus:ring-black transition-all"
+                    className="w-full px-4 py-3 bg-zinc-50 border-none rounded-2xl focus:ring-2 focus:ring-black transition-all"
                     value={formData.data_pagamento_2q}
                     onChange={e => setFormData({...formData, data_pagamento_2q: e.target.value})}
                   />
@@ -405,7 +405,7 @@ const Contracts = () => {
                 </button>
                 <button 
                   type="submit"
-                  className="flex-1 px-6 py-4 bg-black text-white rounded-2xl font-bold hover:bg-zinc-800 transition-all shadow-lg shadow-black/10"
+                  className="flex-1 px-6 py-4 bg-[#c11720] text-white rounded-2xl font-bold hover:bg-red-800 transition-all"
                 >
                   Salvar Contrato
                 </button>
@@ -417,8 +417,8 @@ const Contracts = () => {
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && contractToDelete && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[80] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-sm rounded-3xl p-8 animate-slide-up text-center">
-            <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-6">
+          <div className="bg-white w-full max-w-sm rounded-none p-8 animate-slide-up text-center">
+            <div className="w-16 h-16 bg-[#c11720] text-white rounded-full flex items-center justify-center mx-auto mb-6">
               <AlertCircle size={32} />
             </div>
             <h2 className="text-xl font-bold mb-2">Excluir Contrato?</h2>
@@ -428,13 +428,13 @@ const Contracts = () => {
             <div className="flex gap-3">
               <button 
                 onClick={() => { setIsDeleteModalOpen(false); setContractToDelete(null); }} 
-                className="flex-1 py-3 bg-zinc-100 rounded-xl font-bold text-zinc-600 hover:bg-zinc-200 transition-all"
+                className="flex-1 py-3 bg-zinc-100 rounded-2xl font-bold text-zinc-600 hover:bg-zinc-200 transition-all"
               >
                 Cancelar
               </button>
               <button 
                 onClick={handleDelete} 
-                className="flex-1 py-3 bg-rose-500 text-white rounded-xl font-bold hover:bg-rose-600 transition-all shadow-lg shadow-rose-200"
+                className="flex-1 py-3 bg-[#c11720] text-white rounded-2xl font-bold hover:bg-red-800 transition-all"
               >
                 Sim, Excluir
               </button>

@@ -36,14 +36,14 @@ const NavItem = ({ to, icon: Icon, label, active, onClick }: { to: string, icon:
     to={to}
     onClick={onClick}
     className={cn(
-      "flex items-center gap-3 px-6 py-3 rounded-xl transition-all duration-200 group",
+      "flex items-center gap-3 w-[148px] h-[37px] px-6 rounded-[6px] transition-all duration-200 group",
       active 
-        ? "bg-black text-white shadow-lg shadow-black/10" 
+        ? "bg-[#c11720] text-white" 
         : "text-zinc-500 hover:bg-zinc-100 hover:text-black"
     )}
   >
-    <Icon size={20} className={cn("transition-transform group-hover:scale-110", active ? "text-white" : "text-zinc-400")} />
-    <span className="font-bold text-sm tracking-tight">{label}</span>
+    <Icon size={18} className={cn("transition-transform group-hover:scale-110", active ? "text-white" : "text-zinc-400")} />
+    <span className="font-bold text-sm tracking-tight ml-[3px]">{label}</span>
   </Link>
 );
 
@@ -54,16 +54,18 @@ const Layout = ({ children, user }: { children: React.ReactNode, user: User }) =
   const handleSignOut = () => signOut(auth);
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#F8F9FA] text-zinc-900 font-sans">
+    <div className="flex flex-col h-screen bg-[#F8F9FA] text-zinc-900 font-sans overflow-hidden">
       {/* Top Navigation Bar */}
-      <header className="bg-white border-b border-zinc-200 sticky top-0 z-50">
+      <header className="bg-white border-b border-zinc-200 sticky top-0 z-50 w-full">
         <div className="w-full px-12 h-24 flex items-center justify-between">
           <div className="flex items-center gap-24">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-black rounded-2xl flex items-center justify-center text-white shadow-lg shadow-black/20">
-                <DollarSign size={28} />
-              </div>
-              <h1 className="text-2xl font-black tracking-tighter hidden md:block">CreativeManager</h1>
+              <img 
+                src="https://lh3.googleusercontent.com/d/17CGqfWSpJkMTtlLnU4El8a5vAnXQyz56" 
+                className="h-[50px] w-auto object-contain" 
+                alt="Logo"
+                referrerPolicy="no-referrer"
+              />
             </div>
 
             <nav className="hidden lg:flex items-center gap-4">
@@ -121,7 +123,7 @@ const Layout = ({ children, user }: { children: React.ReactNode, user: User }) =
       )}
 
       {/* Main Content */}
-      <main className="flex-1 p-10 lg:p-16 w-full">
+      <main className="flex-1 p-10 lg:p-16 w-full overflow-y-auto bg-[#F8F9FA]">
         {children}
       </main>
     </div>
@@ -136,17 +138,19 @@ const Login = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F8F9FA] p-6">
-      <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl shadow-black/5 p-10 text-center">
-        <div className="w-20 h-20 bg-black rounded-3xl flex items-center justify-center text-white mx-auto mb-8 shadow-xl shadow-black/20">
-          <DollarSign size={40} />
-        </div>
-        <h1 className="text-3xl font-bold mb-3 tracking-tight">CreativeManager</h1>
+      <div className="w-full max-w-md bg-white rounded-none shadow-2xl shadow-black/5 p-10 text-center">
+        <img 
+          src="https://lh3.googleusercontent.com/d/17CGqfWSpJkMTtlLnU4El8a5vAnXQyz56" 
+          className="h-[84px] w-auto mx-auto mb-8 object-contain" 
+          alt="Logo"
+          referrerPolicy="no-referrer"
+        />
         <p className="text-zinc-500 mb-10 leading-relaxed">
           Gestão profissional de contratos, demandas e rentabilidade para agências e criativos.
         </p>
         <button 
           onClick={handleLogin}
-          className="w-full flex items-center justify-center gap-3 bg-black text-white py-4 rounded-2xl font-semibold hover:bg-zinc-800 transition-all active:scale-95"
+          className="w-full flex items-center justify-center gap-3 bg-[#c11720] text-white py-4 rounded-2xl font-semibold hover:bg-red-800 transition-all active:scale-95"
         >
           <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
           Entrar com Google

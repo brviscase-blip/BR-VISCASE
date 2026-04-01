@@ -23,6 +23,8 @@ export interface Contrato {
   data_pagamento_2q: string;
   status_pagamento_1q: StatusPagamento;
   status_pagamento_2q: StatusPagamento;
+  valor_pagamento_1q?: number;
+  valor_pagamento_2q?: number;
   uid: string;
   created_at?: Timestamp;
 }

@@ -47,12 +47,12 @@ const Team = () => {
     <div className="space-y-8 animate-fade-in">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-bold tracking-tight mb-2">Equipe</h1>
+          <h1 className="text-4xl font-bold tracking-tight mb-2 text-[#c11720]">Equipe</h1>
           <p className="text-zinc-500">Gerencie os colaboradores e proprietários do sistema.</p>
         </div>
         <button 
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center justify-center gap-2 bg-black text-white px-6 py-3 rounded-2xl font-bold hover:bg-zinc-800 transition-all active:scale-95 shadow-lg shadow-black/10"
+          className="flex items-center justify-center gap-2 bg-[#c11720] text-white px-6 py-3 rounded-2xl font-bold hover:bg-red-800 transition-all active:scale-95"
         >
           <UserPlus size={20} />
           Novo Colaborador
@@ -61,10 +61,10 @@ const Team = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {colaboradores.map(colab => (
-          <div key={colab.id} className="bg-white p-8 rounded-3xl border border-zinc-100 shadow-sm hover:shadow-md transition-all group">
+          <div key={colab.id} className="bg-white p-8 rounded-none border border-zinc-100 shadow-sm hover:shadow-md transition-all group">
             <div className="flex justify-between items-start mb-6">
-              <div className={`p-4 rounded-2xl ${colab.tipo === 'Proprietário' ? 'bg-black text-white' : 'bg-zinc-100 text-zinc-600'}`}>
-                {colab.tipo === 'Proprietário' ? <Briefcase size={24} /> : <UserIcon size={24} />}
+              <div className={`p-4 rounded-2xl ${colab.tipo === 'Proprietário' ? 'bg-[#c11720] text-white' : 'bg-zinc-100 text-zinc-600'}`}>
+                {colab.tipo === 'Proprietário' ? <Briefcase size={24} className="text-white" /> : <UserIcon size={24} />}
               </div>
               <button 
                 onClick={() => {
@@ -76,7 +76,7 @@ const Team = () => {
                 <Trash2 size={18} />
               </button>
             </div>
-            <h3 className="text-xl font-bold mb-1">{colab.nome}</h3>
+            <h3 className="text-xl font-bold mb-1 text-[#c11720]">{colab.nome}</h3>
             <p className="text-sm text-zinc-500 mb-4">{colab.tipo}</p>
             {colab.salario_fixo > 0 && (
               <div className="pt-4 border-t border-zinc-50">
@@ -92,7 +92,7 @@ const Team = () => {
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-3xl p-8 animate-slide-up">
+          <div className="bg-white w-full max-w-md rounded-none p-8 animate-slide-up">
             <h2 className="text-2xl font-bold mb-6">Novo Colaborador</h2>
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
@@ -100,7 +100,7 @@ const Team = () => {
                 <input 
                   required
                   type="text" 
-                  className="w-full px-4 py-3 bg-zinc-50 border-none rounded-xl mt-1"
+                  className="w-full px-4 py-3 bg-zinc-50 border-none rounded-2xl mt-1"
                   value={formData.nome}
                   onChange={e => setFormData({...formData, nome: e.target.value})}
                 />
@@ -108,7 +108,7 @@ const Team = () => {
               <div>
                 <label className="text-sm font-bold text-zinc-700">Tipo</label>
                 <select 
-                  className="w-full px-4 py-3 bg-zinc-50 border-none rounded-xl mt-1"
+                  className="w-full px-4 py-3 bg-zinc-50 border-none rounded-2xl mt-1"
                   value={formData.tipo}
                   onChange={e => setFormData({...formData, tipo: e.target.value as TipoColaborador})}
                 >
@@ -121,7 +121,7 @@ const Team = () => {
                 <input 
                   type="number" 
                   step="0.01"
-                  className="w-full px-4 py-3 bg-zinc-50 border-none rounded-xl mt-1"
+                  className="w-full px-4 py-3 bg-zinc-50 border-none rounded-2xl mt-1"
                   value={formData.salario}
                   onChange={e => {
                     const val = parseFloat(e.target.value);
@@ -130,8 +130,8 @@ const Team = () => {
                 />
               </div>
               <div className="flex gap-3 pt-4">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-3 bg-zinc-100 rounded-xl font-bold">Cancelar</button>
-                <button type="submit" className="flex-1 py-3 bg-black text-white rounded-xl font-bold">Salvar</button>
+                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-3 bg-zinc-100 rounded-2xl font-bold">Cancelar</button>
+                <button type="submit" className="flex-1 py-3 bg-[#c11720] text-white rounded-2xl font-bold hover:bg-red-800 transition-all">Salvar</button>
               </div>
             </form>
           </div>
@@ -140,8 +140,8 @@ const Team = () => {
 
       {isDeleteModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[80] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-sm rounded-3xl p-8 animate-slide-up text-center">
-            <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-6">
+          <div className="bg-white w-full max-w-sm rounded-none p-8 animate-slide-up text-center">
+            <div className="w-16 h-16 bg-[#c11720] text-white rounded-full flex items-center justify-center mx-auto mb-6">
               <AlertCircle size={32} />
             </div>
             <h2 className="text-xl font-bold mb-2">Excluir Colaborador?</h2>
@@ -151,13 +151,13 @@ const Team = () => {
             <div className="flex gap-3">
               <button 
                 onClick={() => { setIsDeleteModalOpen(false); setColabToDelete(null); }} 
-                className="flex-1 py-3 bg-zinc-100 rounded-xl font-bold text-zinc-600 hover:bg-zinc-200 transition-all"
+                className="flex-1 py-3 bg-zinc-100 rounded-none font-bold text-zinc-600 hover:bg-zinc-200 transition-all"
               >
                 Cancelar
               </button>
               <button 
                 onClick={handleDelete} 
-                className="flex-1 py-3 bg-rose-500 text-white rounded-xl font-bold hover:bg-rose-600 transition-all shadow-lg shadow-rose-200"
+                className="flex-1 py-3 bg-[#c11720] text-white rounded-none font-bold hover:bg-red-800 transition-all"
               >
                 Sim, Excluir
               </button>
