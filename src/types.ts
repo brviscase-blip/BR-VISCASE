@@ -1,0 +1,61 @@
+import { Timestamp } from 'firebase/firestore';
+
+export type Pacote = 
+  | "Starter Master Acessível"
+  | "Nível Pro Acessível"
+  | "Master Potencial"
+  | "Nível Pro Potencial"
+  | "Starter";
+
+export type StatusContrato = "Ativo" | "Inativo" | "Encerrado";
+export type StatusPagamento = "Pendente" | "Pago" | "Atrasado";
+export type TipoDemanda = "Criativo" | "Carrossel" | "Gestão de Conteúdo" | "Captação" | "Vídeo";
+export type TipoColaborador = "Equipe" | "Proprietário";
+
+export interface Contrato {
+  id: string;
+  nome: string;
+  pacote: Pacote;
+  valor_bruto: number;
+  data_inicio: string;
+  status: StatusContrato;
+  data_pagamento_1q: string;
+  data_pagamento_2q: string;
+  status_pagamento_1q: StatusPagamento;
+  status_pagamento_2q: StatusPagamento;
+  uid: string;
+  created_at?: Timestamp;
+}
+
+export interface DemandaContrato {
+  id: string;
+  contrato_id: string;
+  tipo_demanda: TipoDemanda;
+  quantidade_total: number;
+}
+
+export interface Colaborador {
+  id: string;
+  nome: string;
+  tipo: TipoColaborador;
+  salario_fixo: number;
+  uid?: string;
+}
+
+export interface DistribuicaoDemanda {
+  id: string;
+  contrato_id: string;
+  colaborador_id: string;
+  tipo_demanda: TipoDemanda;
+  quantidade: number;
+  valor_unitario: number;
+  valor_total: number;
+}
+
+export const PRECOS_DEMANDAS: Record<TipoDemanda, number> = {
+  "Criativo": 12.00,
+  "Carrossel": 17.00,
+  "Gestão de Conteúdo": 150.00,
+  "Captação": 50.00,
+  "Vídeo": 40.00
+};

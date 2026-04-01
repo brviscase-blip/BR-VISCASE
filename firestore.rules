@@ -1,0 +1,89 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: contratos
+    // Fields: nome, pacote, valor_bruto, data_inicio, status, data_pagamento_1q, data_pagamento_2q, status_pagamento_1q, status_pagamento_2q, uid
+    //
+    // Collection: demandas_contrato
+    // Fields: contrato_id, tipo_demanda, quantidade_total
+    //
+    // Collection: colaboradores
+    // Fields: nome, tipo, salario_fixo, uid
+    //
+    // Collection: distribuicao_demandas
+    // Fields: contrato_id, colaborador_id, tipo_demanda, quantidade, valor_unitario, valor_total
+    //
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.uid;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        (request.auth.token.email.lower() == "rodriguesrafael.r12@gmail.com") ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function isValidContrato(data) {
+      return data.nome is string && data.nome.size() > 0 && data.nome.size() < 100 &&
+             data.pacote in ["Starter Master Acessível", "Nível Pro Acessível", "Master Potencial", "Nível Pro Potencial", "Starter"] &&
+             data.valor_bruto is number && data.valor_bruto >= 0 &&
+             data.status in ["Ativo", "Inativo", "Encerrado"];
+    }
+
+    match /contratos/{contratoId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidContrato(request.resource.data) && request.resource.data.uid == request.auth.uid;
+      allow update: if isAuthenticated() && isValidContrato(request.resource.data) && (request.auth.uid == resource.data.uid || isAdmin());
+      allow delete: if isAuthenticated();
+    }
+
+    function isValidDemanda(data) {
+      return data.tipo_demanda in ["Criativo", "Carrossel", "Gestão de Conteúdo", "Captação", "Vídeo"] &&
+             data.quantidade_total is int && data.quantidade_total >= 0;
+    }
+
+    match /demandas_contrato/{demandaId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && isValidDemanda(request.resource.data);
+      allow delete: if isAuthenticated() || isAdmin();
+    }
+
+    match /colaboradores/{colaboradorId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if isDocOwner() || isAdmin();
+    }
+
+    match /distribuicao_demandas/{distribuicaoId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAuthenticated() || isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create, update: if isOwner(userId);
+    }
+  }
+}

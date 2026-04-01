@@ -1,0 +1,65 @@
+{
+  "entities": {
+    "contrato": {
+      "title": "Contrato",
+      "description": "Dados principais do contrato de serviço criativo.",
+      "type": "object",
+      "properties": {
+        "nome": { "type": "string", "description": "Nome do contrato" },
+        "pacote": { "type": "string", "enum": ["Starter Master Acessível", "Nível Pro Acessível", "Master Potencial", "Nível Pro Potencial", "Starter"], "description": "Pacote contratado" },
+        "valor_bruto": { "type": "number", "description": "Valor bruto do contrato" },
+        "data_inicio": { "type": "string", "format": "date", "description": "Data de início do contrato" },
+        "status": { "type": "string", "enum": ["Ativo", "Inativo", "Encerrado"], "description": "Status do contrato" },
+        "data_pagamento_1q": { "type": "string", "format": "date", "description": "Data de vencimento da 1ª quinzena" },
+        "data_pagamento_2q": { "type": "string", "format": "date", "description": "Data de vencimento da 2ª quinzena" },
+        "status_pagamento_1q": { "type": "string", "enum": ["Pendente", "Pago", "Atrasado"], "description": "Status do pagamento da 1ª quinzena" },
+        "status_pagamento_2q": { "type": "string", "enum": ["Pendente", "Pago", "Atrasado"], "description": "Status do pagamento da 2ª quinzena" },
+        "uid": { "type": "string", "description": "UID do dono do contrato" }
+      },
+      "required": ["nome", "pacote", "valor_bruto", "data_inicio", "status", "uid"]
+    },
+    "demanda": {
+      "title": "Demanda",
+      "description": "Tipos de demanda vinculados a um contrato.",
+      "type": "object",
+      "properties": {
+        "contrato_id": { "type": "string", "description": "ID do contrato vinculado" },
+        "tipo_demanda": { "type": "string", "enum": ["Criativo", "Carrossel", "Gestão de Conteúdo", "Captação", "Vídeo"], "description": "Tipo de demanda" },
+        "quantidade_total": { "type": "integer", "description": "Quantidade total contratada" }
+      },
+      "required": ["contrato_id", "tipo_demanda", "quantidade_total"]
+    },
+    "colaborador": {
+      "title": "Colaborador",
+      "description": "Membros da equipe ou proprietários.",
+      "type": "object",
+      "properties": {
+        "nome": { "type": "string", "description": "Nome do colaborador" },
+        "tipo": { "type": "string", "enum": ["Equipe", "Proprietário"], "description": "Tipo de colaborador" },
+        "salario_fixo": { "type": "number", "description": "Salário fixo mensal" },
+        "uid": { "type": "string", "description": "UID do colaborador (se houver login)" }
+      },
+      "required": ["nome", "tipo"]
+    },
+    "distribuicao": {
+      "title": "Distribuição de Demanda",
+      "description": "Atribuição de demandas específicas a colaboradores.",
+      "type": "object",
+      "properties": {
+        "contrato_id": { "type": "string", "description": "ID do contrato" },
+        "colaborador_id": { "type": "string", "description": "ID do colaborador" },
+        "tipo_demanda": { "type": "string", "description": "Tipo de demanda" },
+        "quantidade": { "type": "integer", "description": "Quantidade atribuída" },
+        "valor_unitario": { "type": "number", "description": "Valor unitário da demanda" },
+        "valor_total": { "type": "number", "description": "Valor total da distribuição" }
+      },
+      "required": ["contrato_id", "colaborador_id", "tipo_demanda", "quantidade", "valor_unitario", "valor_total"]
+    }
+  },
+  "firestore": {
+    "/contratos/{contratoId}": { "schema": "contrato", "description": "Coleção de contratos" },
+    "/demandas_contrato/{demandaId}": { "schema": "demanda", "description": "Demandas por contrato" },
+    "/colaboradores/{colaboradorId}": { "schema": "colaborador", "description": "Coleção de colaboradores" },
+    "/distribuicao_demandas/{distribuicaoId}": { "schema": "distribuicao", "description": "Distribuição de demandas" }
+  }
+}
