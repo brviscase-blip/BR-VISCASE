@@ -407,7 +407,7 @@ const ContractDetails = () => {
         <div className="lg:col-span-2 bg-white p-8 rounded-none border border-zinc-100 shadow-sm">
           <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-[#c11720]">
             <Users size={20} className="text-[#c11720]" />
-            Resumo de Perda Aceitável por Pessoa
+            Demandas por Equipe
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {colaboradores.filter(c => distribuicoes.some(d => d.colaborador_id === c.id)).map(colab => {
