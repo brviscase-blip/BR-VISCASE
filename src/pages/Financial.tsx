@@ -60,7 +60,7 @@ const Financial = () => {
       const monthEnd = endOfMonth(month);
       
       const monthContracts = contracts.filter(c => {
-        const start = parseISO(c.data_inicio);
+        const start = c.created_at ? c.created_at.toDate() : new Date();
         return isWithinInterval(start, { start: monthStart, end: monthEnd }) || c.status === 'Ativo';
       });
 
@@ -71,6 +71,8 @@ const Financial = () => {
           const colab = colaboradores.find(col => col.id === d.colaborador_id);
           // Exception: "Captação" is always a cost, even for "Proprietário"
           if (colab?.tipo === 'Proprietário' && d.tipo_demanda !== 'Captação') return sum;
+          // Exclude the contract's main partner from costs, as their value is already deducted from valor_bruto
+          if (c.tem_parceria && colab?.id === c.parceiro_id) return sum;
           return sum + (Number(d.valor_total) || 0);
         }, 0);
       }, 0);

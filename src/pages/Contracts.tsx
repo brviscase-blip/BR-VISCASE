@@ -62,8 +62,11 @@ const Contracts = () => {
   const [formData, setFormData] = useState({
     nome: '',
     pacote: 'Starter' as Pacote,
+    valor_total_cliente: 0,
     valor_bruto: 0,
-    data_inicio: format(new Date(), 'yyyy-MM-dd'),
+    tem_parceria: false,
+    parceiro_id: '',
+    valor_parceiro: 0,
     data_pagamento_1q: '',
     data_pagamento_2q: '',
   });
@@ -135,15 +138,29 @@ const Contracts = () => {
     setFormData({
       nome: '',
       pacote: 'Starter',
+      valor_total_cliente: 0,
       valor_bruto: 0,
-      data_inicio: format(new Date(), 'yyyy-MM-dd'),
+      tem_parceria: false,
+      parceiro_id: '',
+      valor_parceiro: 0,
       data_pagamento_1q: '',
       data_pagamento_2q: '',
     });
 
+    const valorBruto = dataToSave.tem_parceria ? dataToSave.valor_bruto : dataToSave.valor_total_cliente;
+    const valorTotalCliente = dataToSave.tem_parceria ? (dataToSave.valor_bruto + dataToSave.valor_parceiro) : dataToSave.valor_total_cliente;
+
     try {
       await addDoc(collection(db, 'contratos'), {
-        ...dataToSave,
+        nome: dataToSave.nome,
+        pacote: dataToSave.pacote,
+        valor_total_cliente: valorTotalCliente,
+        tem_parceria: dataToSave.tem_parceria,
+        parceiro_id: dataToSave.tem_parceria ? dataToSave.parceiro_id : null,
+        valor_parceiro: dataToSave.tem_parceria ? dataToSave.valor_parceiro : 0,
+        valor_bruto: valorBruto,
+        data_pagamento_1q: dataToSave.data_pagamento_1q,
+        data_pagamento_2q: dataToSave.data_pagamento_2q,
         status: 'Ativo',
         status_pagamento_1q: 'Pendente',
         status_pagamento_2q: 'Pendente',
@@ -230,6 +247,8 @@ const Contracts = () => {
                   const colab = colaboradores.find(c => c.id === d.colaborador_id);
                   // Exception: "Captação" is always a cost, even for "Proprietário"
                   if (colab?.tipo === 'Proprietário' && d.tipo_demanda !== 'Captação') return acc;
+                  // Exclude the contract's main partner from costs, as their value is already deducted from valor_bruto
+                  if (contract.tem_parceria && colab?.id === contract.parceiro_id) return acc;
                   return acc + (Number(d.valor_total) || 0);
                 }, 0);
                 
@@ -246,7 +265,7 @@ const Contracts = () => {
                     <td className="px-6 py-5">
                       <div className="font-bold text-[#c11720] group-hover:text-red-700" style={{ fontFamily: 'Arial' }}>{contract.nome}</div>
                       <div className="text-xs text-[#7b564d] font-bold">{contract.pacote}</div>
-                      <div className="text-[11px] text-zinc-400">Início: {format(parseISO(contract.data_inicio), 'dd/MM/yyyy')}</div>
+                      <div className="text-[11px] text-zinc-400">Início: {contract.created_at ? format(contract.created_at.toDate(), 'dd/MM/yyyy') : 'N/A'}</div>
                     </td>
                     <td className="px-6 py-5">
                       <span className="text-sm font-bold text-zinc-700">{totalDemandsCount} un.</span>
@@ -357,31 +376,92 @@ const Contracts = () => {
                     <option value="Nível Pro Potencial">Nível Pro Potencial</option>
                   </select>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-[#c11720]">Valor Bruto (R$)</label>
-                  <input 
-                    required
-                    type="number" 
-                    step="0.01"
-                    className="w-full px-4 py-3 bg-zinc-50 border-none rounded-2xl focus:ring-2 focus:ring-black transition-all"
-                    placeholder="0,00"
-                    value={formData.valor_bruto}
-                    onChange={e => {
-                      const val = parseFloat(e.target.value);
-                      setFormData({...formData, valor_bruto: isNaN(val) ? 0 : val});
-                    }}
-                  />
+                <div className="space-y-2 col-span-1 md:col-span-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      className="w-5 h-5 rounded border-zinc-300 text-[#c11720] focus:ring-[#c11720]"
+                      checked={formData.tem_parceria}
+                      onChange={e => setFormData({...formData, tem_parceria: e.target.checked})}
+                    />
+                    <span className="text-sm font-bold text-zinc-700">Este contrato possui um Parceiro Estratégico?</span>
+                  </label>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-[#c11720]">Data de Início</label>
-                  <input 
-                    required
-                    type="date" 
-                    className="w-full px-4 py-3 bg-zinc-50 border-none rounded-2xl focus:ring-2 focus:ring-black transition-all"
-                    value={formData.data_inicio}
-                    onChange={e => setFormData({...formData, data_inicio: e.target.value})}
-                  />
-                </div>
+
+                {formData.tem_parceria ? (
+                  <>
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-[#c11720]">Valor da Agência (R$)</label>
+                      <input 
+                        required
+                        type="number" 
+                        step="0.01"
+                        className="w-full px-4 py-3 bg-zinc-50 border-none rounded-2xl focus:ring-2 focus:ring-black transition-all"
+                        placeholder="0,00"
+                        value={formData.valor_bruto}
+                        onChange={e => {
+                          const val = parseFloat(e.target.value);
+                          setFormData({...formData, valor_bruto: isNaN(val) ? 0 : val});
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-[#c11720]">Valor do Parceiro (R$)</label>
+                      <input 
+                        required={formData.tem_parceria}
+                        type="number" 
+                        step="0.01"
+                        className="w-full px-4 py-3 bg-zinc-50 border-none rounded-2xl focus:ring-2 focus:ring-black transition-all"
+                        placeholder="0,00"
+                        value={formData.valor_parceiro}
+                        onChange={e => {
+                          const val = parseFloat(e.target.value);
+                          setFormData({...formData, valor_parceiro: isNaN(val) ? 0 : val});
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-[#c11720]">Selecione o Parceiro</label>
+                      <select 
+                        required={formData.tem_parceria}
+                        className="w-full px-4 py-3 bg-zinc-50 border-none rounded-2xl focus:ring-2 focus:ring-black transition-all"
+                        value={formData.parceiro_id}
+                        onChange={e => setFormData({...formData, parceiro_id: e.target.value})}
+                      >
+                        <option value="">Selecione...</option>
+                        {colaboradores.filter(c => c.tipo === 'Parceria').map(p => (
+                          <option key={p.id} value={p.id}>{p.nome}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-zinc-500">Valor Total do Contrato (R$)</label>
+                      <input 
+                        disabled
+                        type="text" 
+                        className="w-full px-4 py-3 bg-zinc-100 border-none rounded-2xl text-zinc-500 font-bold"
+                        value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(formData.valor_bruto + formData.valor_parceiro)}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-[#c11720]">Valor Total do Contrato (R$)</label>
+                    <input 
+                      required
+                      type="number" 
+                      step="0.01"
+                      className="w-full px-4 py-3 bg-zinc-50 border-none rounded-2xl focus:ring-2 focus:ring-black transition-all"
+                      placeholder="0,00"
+                      value={formData.valor_total_cliente}
+                      onChange={e => {
+                        const val = parseFloat(e.target.value);
+                        setFormData({...formData, valor_total_cliente: isNaN(val) ? 0 : val});
+                      }}
+                    />
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-[#c11720]">Vencimento 1ª Quinzena</label>
                   <input 

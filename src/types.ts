@@ -16,8 +16,11 @@ export interface Contrato {
   id: string;
   nome: string;
   pacote: Pacote;
-  valor_bruto: number;
-  data_inicio: string;
+  valor_bruto: number; // Valor da Agência (ex: 850)
+  valor_total_cliente?: number; // Valor Total pago pelo cliente (ex: 1250)
+  tem_parceria?: boolean;
+  parceiro_id?: string;
+  valor_parceiro?: number;
   status: StatusContrato;
   data_pagamento_1q: string;
   data_pagamento_2q: string;

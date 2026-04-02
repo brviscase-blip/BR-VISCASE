@@ -98,6 +98,8 @@ const Dashboard = () => {
         const colab = colaboradores.find(c => c.id === d.colaborador_id);
         // Exception: "Captação" is always a cost, even for "Proprietário"
         if (colab?.tipo === 'Proprietário' && d.tipo_demanda !== 'Captação') return acc;
+        // Exclude the contract's main partner from costs, as their value is already deducted from valor_bruto
+        if (contract.tem_parceria && colab?.id === contract.parceiro_id) return acc;
         return acc + (Number(d.valor_total) || 0);
       }, 0);
       const net = (Number(contract.valor_bruto) || 0) - costs;

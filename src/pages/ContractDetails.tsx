@@ -281,6 +281,9 @@ const ContractDetails = () => {
     const colab = colaboradores.find(c => c.id === d.colaborador_id);
     // Exception: "Captação" is always a cost, even for "Proprietário"
     if (colab?.tipo === 'Proprietário' && d.tipo_demanda !== 'Captação') return acc;
+    // Exclude the contract's main partner from costs, as their value is already deducted from valor_bruto
+    if (contract.tem_parceria && colab?.id === contract.parceiro_id) return acc;
+    
     return acc + (Number(d.valor_total) || 0);
   }, 0);
   const netRevenue = (Number(contract.valor_bruto) || 0) - totalCosts;
@@ -306,7 +309,7 @@ const ContractDetails = () => {
               {contract.pacote}
             </span>
           </div>
-          <p className="text-zinc-500">Iniciado em {format(parseISO(contract.data_inicio), 'dd/MM/yyyy')}</p>
+          <p className="text-zinc-500">Iniciado em {contract.created_at ? format(contract.created_at.toDate(), 'dd/MM/yyyy') : 'N/A'}</p>
         </div>
         <div className="flex gap-3">
           <div className="bg-white px-6 py-4 rounded-none border border-zinc-100 shadow-sm group">
@@ -330,9 +333,21 @@ const ContractDetails = () => {
         </div>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className={cn("grid grid-cols-1 md:grid-cols-2 gap-6", contract.tem_parceria ? "lg:grid-cols-3 xl:grid-cols-6" : "lg:grid-cols-4")}>
+        {contract.tem_parceria && (
+          <>
+            <div className="bg-white p-6 rounded-none border border-zinc-100 shadow-sm">
+              <p className="text-zinc-500 text-sm mb-1">Valor Total</p>
+              <p className="text-2xl font-bold">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(contract.valor_total_cliente || 0)}</p>
+            </div>
+            <div className="bg-white p-6 rounded-none border border-zinc-100 shadow-sm">
+              <p className="text-zinc-500 text-sm mb-1">Valor Parceiro</p>
+              <p className="text-2xl font-bold text-amber-600">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(contract.valor_parceiro || 0)}</p>
+            </div>
+          </>
+        )}
         <div className="bg-white p-6 rounded-none border border-zinc-100 shadow-sm">
-          <p className="text-zinc-500 text-sm mb-1">Valor Bruto</p>
+          <p className="text-zinc-500 text-sm mb-1">{contract.tem_parceria ? 'Valor Bruto (Agência)' : 'Valor Bruto'}</p>
           <p className="text-2xl font-bold">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(contract.valor_bruto)}</p>
         </div>
         <div className="bg-white p-6 rounded-none border border-zinc-100 shadow-sm">
@@ -345,7 +360,7 @@ const ContractDetails = () => {
         </div>
         <div className={`p-6 rounded-none border shadow-sm transition-colors ${margin < 75 ? 'bg-rose-50 border-rose-100' : 'bg-emerald-50 border-emerald-100'}`}>
           <div className="flex justify-between items-start mb-1">
-            <p className="text-zinc-500 text-sm">Receita Líquida</p>
+            <p className="text-zinc-500 text-sm">Margem de Lucro</p>
             {margin < 75 && <AlertCircle size={18} className="text-rose-500" />}
           </div>
           <p className={`text-2xl font-bold ${margin < 75 ? 'text-rose-600' : 'text-emerald-600'}`}>{margin.toFixed(1)}%</p>
@@ -410,7 +425,34 @@ const ContractDetails = () => {
             Demandas por Equipe
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {colaboradores.filter(c => distribuicoes.some(d => d.colaborador_id === c.id)).map(colab => {
+            {/* Show main partner if exists */}
+            {contract.tem_parceria && contract.parceiro_id && (
+              <div className="bg-amber-50 border border-amber-100 p-4 rounded-none flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-bold text-zinc-900">
+                        {colaboradores.find(c => c.id === contract.parceiro_id)?.nome || 'Parceiro'}
+                      </p>
+                      <span className="text-[8px] bg-amber-500 text-white px-1.5 py-0.5 rounded-full font-bold uppercase">Parceiro Principal</span>
+                    </div>
+                    <p className="text-[10px] text-zinc-500 font-bold uppercase">
+                      Repasse Direto
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-amber-700">
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(contract.valor_parceiro || 0)}
+                    </p>
+                    <p className="text-[10px] text-zinc-400 font-medium">
+                      Valor Fixo
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {colaboradores.filter(c => distribuicoes.some(d => d.colaborador_id === c.id) && (!contract.tem_parceria || c.id !== contract.parceiro_id)).map(colab => {
               const colabDists = distribuicoes.filter(d => d.colaborador_id === colab.id);
               const totalColab = colabDists.reduce((acc, d) => acc + d.valor_total, 0);
               const isOwner = colab.tipo === 'Proprietário';
