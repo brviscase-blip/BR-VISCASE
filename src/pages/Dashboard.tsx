@@ -167,7 +167,11 @@ const Dashboard = () => {
         />
         <StatCard 
           title="Mediana de Receita Líquida" 
-          value={`${stats.medianMargin.toFixed(1)}%`}
+          value={
+            <span className={stats.medianMargin >= 75 ? 'text-emerald-600' : 'text-rose-600'}>
+              {stats.medianMargin.toFixed(1)}%
+            </span>
+          }
           subValue="Meta: ≥ 70%"
           icon={BarChart3}
           color="bg-[#7b564d] text-white"
@@ -241,7 +245,9 @@ const Dashboard = () => {
                 <div className="w-3 h-3 rounded-none bg-[#7b564d]" />
                 <span className="text-zinc-600">Receita Líquida</span>
               </div>
-              <span className="font-bold">{stats.medianMargin.toFixed(1)}%</span>
+              <span className={`font-bold ${stats.medianMargin >= 75 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                {stats.medianMargin.toFixed(1)}%
+              </span>
             </div>
             <div className="flex justify-between items-center text-sm">
               <div className="flex items-center gap-2">

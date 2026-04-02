@@ -130,23 +130,25 @@ const Contracts = () => {
     e.preventDefault();
     if (!auth.currentUser) return;
 
+    const dataToSave = { ...formData };
+    setIsModalOpen(false);
+    setFormData({
+      nome: '',
+      pacote: 'Starter',
+      valor_bruto: 0,
+      data_inicio: format(new Date(), 'yyyy-MM-dd'),
+      data_pagamento_1q: '',
+      data_pagamento_2q: '',
+    });
+
     try {
       await addDoc(collection(db, 'contratos'), {
-        ...formData,
+        ...dataToSave,
         status: 'Ativo',
         status_pagamento_1q: 'Pendente',
         status_pagamento_2q: 'Pendente',
         uid: auth.currentUser.uid,
         created_at: serverTimestamp()
-      });
-      setIsModalOpen(false);
-      setFormData({
-        nome: '',
-        pacote: 'Starter',
-        valor_bruto: 0,
-        data_inicio: format(new Date(), 'yyyy-MM-dd'),
-        data_pagamento_1q: '',
-        data_pagamento_2q: '',
       });
     } catch (error) {
       console.error("Erro ao criar contrato:", error);
@@ -155,10 +157,12 @@ const Contracts = () => {
 
   const handleDelete = async () => {
     if (!contractToDelete) return;
+    const idToDelete = contractToDelete.id;
+    setIsDeleteModalOpen(false);
+    setContractToDelete(null);
+
     try {
-      await deleteDoc(doc(db, 'contratos', contractToDelete.id));
-      setIsDeleteModalOpen(false);
-      setContractToDelete(null);
+      await deleteDoc(doc(db, 'contratos', idToDelete));
     } catch (error) {
       console.error("Erro ao excluir contrato:", error);
     }
@@ -259,7 +263,9 @@ const Contracts = () => {
                     </td>
                     <td className="px-6 py-5">
                       <div className="flex flex-col">
-                        <span className="text-sm font-bold text-[#c11720]">{marginPercentage.toFixed(1)}%</span>
+                        <span className={`text-sm font-bold ${marginPercentage >= 75 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                          {marginPercentage.toFixed(1)}%
+                        </span>
                         <span className="text-[11px] font-bold text-zinc-400">PERDA ACEITÁVEL: {lossPercentage.toFixed(1)}%</span>
                       </div>
                     </td>

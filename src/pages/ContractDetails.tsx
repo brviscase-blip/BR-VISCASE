@@ -44,7 +44,7 @@ const ContractDetails = () => {
     id: string, 
     tipo: TipoDemanda, 
     qtd: number,
-    dists: { id?: string, colabId: string, qtd: number }[]
+    dists: { id?: string, colabId: string, qtd: number, valor_total?: number }[]
   } | null>(null);
   const [demandaToDelete, setDemandaToDelete] = useState<string | null>(null);
   const [distsToDelete, setDistsToDelete] = useState<string[]>([]);
@@ -104,69 +104,80 @@ const ContractDetails = () => {
 
   const handleAddDemanda = async () => {
     if (!id || newDemanda.qtd <= 0) return;
+    const dataToSave = { ...newDemanda };
+    setIsAddingDemanda(false);
+    setNewDemanda({ tipo: 'Criativo', qtd: 0 });
+
     await addDoc(collection(db, 'demandas_contrato'), {
       contrato_id: id,
-      tipo_demanda: newDemanda.tipo,
-      quantidade_total: newDemanda.qtd
+      tipo_demanda: dataToSave.tipo,
+      quantidade_total: dataToSave.qtd
     });
-    setIsAddingDemanda(false);
   };
 
   const handleUpdateDemanda = async () => {
     if (!editingDemandaData || editingDemandaData.qtd < 0) return;
     
-    let currentDemandaId = editingDemandaData.id;
+    const dataToSave = { ...editingDemandaData };
+    const distsToDeleteNow = [...distsToDelete];
+    
+    setIsEditingDemanda(false);
+    setEditingDemandaData(null);
+    setDistsToDelete([]);
+
+    let currentDemandaId = dataToSave.id;
 
     // Update or Create main demand
     if (currentDemandaId.startsWith('temp-')) {
       const docRef = await addDoc(collection(db, 'demandas_contrato'), {
         contrato_id: id,
-        tipo_demanda: editingDemandaData.tipo,
-        quantidade_total: editingDemandaData.qtd
+        tipo_demanda: dataToSave.tipo,
+        quantidade_total: dataToSave.qtd
       });
       currentDemandaId = docRef.id;
     } else {
       await updateDoc(doc(db, 'demandas_contrato', currentDemandaId), {
-        tipo_demanda: editingDemandaData.tipo,
-        quantidade_total: editingDemandaData.qtd
+        tipo_demanda: dataToSave.tipo,
+        quantidade_total: dataToSave.qtd
       });
     }
 
     // Handle distributions
-    const valorUnit = PRECOS_DEMANDAS[editingDemandaData.tipo];
+    const valorUnit = PRECOS_DEMANDAS[dataToSave.tipo];
 
     // 1. Delete removed distributions
-    for (const distId of distsToDelete) {
+    for (const distId of distsToDeleteNow) {
       await deleteDoc(doc(db, 'distribuicao_demandas', distId));
     }
 
     // 2. Update or Create distributions
-    for (const dist of editingDemandaData.dists) {
+    for (const dist of dataToSave.dists) {
+      const colab = colaboradores.find(c => c.id === dist.colabId);
+      const isParceria = colab?.tipo === 'Parceria';
+      const finalValorTotal = isParceria ? (dist.valor_total || 0) : (dist.qtd * valorUnit);
+      const finalValorUnit = isParceria ? (dist.qtd > 0 ? finalValorTotal / dist.qtd : 0) : valorUnit;
+
       if (dist.id) {
         // Update existing
         await updateDoc(doc(db, 'distribuicao_demandas', dist.id), {
           colaborador_id: dist.colabId,
           quantidade: dist.qtd,
-          tipo_demanda: editingDemandaData.tipo, // Sync type if changed
-          valor_unitario: valorUnit,
-          valor_total: dist.qtd * valorUnit
+          tipo_demanda: dataToSave.tipo, // Sync type if changed
+          valor_unitario: finalValorUnit,
+          valor_total: finalValorTotal
         });
       } else {
         // Create new
         await addDoc(collection(db, 'distribuicao_demandas'), {
           contrato_id: id,
           colaborador_id: dist.colabId,
-          tipo_demanda: editingDemandaData.tipo,
+          tipo_demanda: dataToSave.tipo,
           quantidade: dist.qtd,
-          valor_unitario: valorUnit,
-          valor_total: dist.qtd * valorUnit
+          valor_unitario: finalValorUnit,
+          valor_total: finalValorTotal
         });
       }
     }
-
-    setIsEditingDemanda(false);
-    setEditingDemandaData(null);
-    setDistsToDelete([]);
   };
 
   const handleDeleteDemanda = async (demandaId: string) => {
@@ -176,28 +187,47 @@ const ContractDetails = () => {
 
   const confirmDeleteDemanda = async () => {
     if (!demandaToDelete) return;
-    await deleteDoc(doc(db, 'demandas_contrato', demandaToDelete));
+    const idToDelete = demandaToDelete;
     setIsDeletingDemanda(false);
     setDemandaToDelete(null);
+
+    // Delete distributions first
+    const distsToDelete = distribuicoes.filter(d => d.tipo_demanda === demandas.find(dem => dem.id === idToDelete)?.tipo_demanda);
+    for (const dist of distsToDelete) {
+      await deleteDoc(doc(db, 'distribuicao_demandas', dist.id));
+    }
+
+    // Delete the demand
+    await deleteDoc(doc(db, 'demandas_contrato', idToDelete));
   };
 
   const handleAddDist = async () => {
     if (!id || !newDist.colabId || newDist.qtd <= 0) return;
-    const valorUnit = PRECOS_DEMANDAS[newDist.tipo];
+    const dataToSave = { ...newDist };
+    setIsAddingDist(false);
+    setNewDist({ colabId: '', tipo: 'Criativo', qtd: 0 });
+
+    const valorUnit = PRECOS_DEMANDAS[dataToSave.tipo];
     await addDoc(collection(db, 'distribuicao_demandas'), {
       contrato_id: id,
-      colaborador_id: newDist.colabId,
-      tipo_demanda: newDist.tipo,
-      quantidade: newDist.qtd,
+      colaborador_id: dataToSave.colabId,
+      tipo_demanda: dataToSave.tipo,
+      quantidade: dataToSave.qtd,
       valor_unitario: valorUnit,
-      valor_total: newDist.qtd * valorUnit
+      valor_total: dataToSave.qtd * valorUnit
     });
-    setIsAddingDist(false);
   };
 
   const updatePaymentStatus = async (field: 'status_pagamento_1q' | 'status_pagamento_2q', status: string) => {
     if (!id) return;
     await updateDoc(doc(db, 'contratos', id), { [field]: status });
+  };
+
+  const updateDistProgress = async (distId: string, field: 'quantidade_concluida' | 'quantidade_paga', value: string) => {
+    const numValue = parseInt(value) || 0;
+    await updateDoc(doc(db, 'distribuicao_demandas', distId), {
+      [field]: numValue
+    });
   };
 
   const updatePaymentValue = async (field: 'valor_pagamento_1q' | 'valor_pagamento_2q') => {
@@ -313,12 +343,12 @@ const ContractDetails = () => {
           <p className="text-zinc-500 text-sm mb-1">Receita Líquida</p>
           <p className="text-2xl font-bold text-emerald-500">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(netRevenue)}</p>
         </div>
-        <div className={`p-6 rounded-none border shadow-sm transition-colors ${isAtRisk ? 'bg-rose-50 border-rose-100' : 'bg-emerald-50 border-emerald-100'}`}>
+        <div className={`p-6 rounded-none border shadow-sm transition-colors ${margin < 75 ? 'bg-rose-50 border-rose-100' : 'bg-emerald-50 border-emerald-100'}`}>
           <div className="flex justify-between items-start mb-1">
             <p className="text-zinc-500 text-sm">Receita Líquida</p>
-            {isAtRisk && <AlertCircle size={18} className="text-rose-500" />}
+            {margin < 75 && <AlertCircle size={18} className="text-rose-500" />}
           </div>
-          <p className={`text-2xl font-bold ${isAtRisk ? 'text-rose-600' : 'text-emerald-600'}`}>{margin.toFixed(1)}%</p>
+          <p className={`text-2xl font-bold ${margin < 75 ? 'text-rose-600' : 'text-emerald-600'}`}>{margin.toFixed(1)}%</p>
           <p className="text-[10px] font-bold uppercase mt-1 opacity-60">Perda Aceitável: {loss.toFixed(1)}%</p>
         </div>
       </div>
@@ -345,7 +375,11 @@ const ContractDetails = () => {
                     <select 
                       value={p.status}
                       onChange={(e) => updatePaymentStatus(p.field as any, e.target.value)}
-                      className="text-xs font-bold bg-white border border-zinc-200 rounded-none px-2 py-1 focus:ring-1 focus:ring-black outline-none"
+                      className={`text-xs font-bold border rounded-none px-2 py-1 focus:ring-1 focus:ring-black outline-none ${
+                        p.status === 'Pago' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                        p.status === 'Atrasado' ? 'bg-rose-50 text-rose-700 border-rose-100' :
+                        'bg-amber-50 text-amber-700 border-amber-100'
+                      }`}
                     >
                       <option value="Pendente">Pendente</option>
                       <option value="Pago">Pago</option>
@@ -383,25 +417,91 @@ const ContractDetails = () => {
               
               return (
                 <div key={colab.id} className={cn(
-                  "p-4 rounded-none flex items-center justify-between border",
+                  "p-4 rounded-none border flex flex-col gap-4",
                   isOwner ? "bg-emerald-50 border-emerald-100" : "bg-zinc-50 border-transparent"
                 )}>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="font-bold text-zinc-900">{colab.nome}</p>
-                      {isOwner && (
-                        <span className="text-[8px] bg-emerald-500 text-white px-1.5 py-0.5 rounded-full font-bold uppercase">Proprietário</span>
-                      )}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="font-bold text-zinc-900">{colab.nome}</p>
+                        {isOwner && (
+                          <span className="text-[8px] bg-emerald-500 text-white px-1.5 py-0.5 rounded-full font-bold uppercase">Proprietário</span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-zinc-500 font-bold uppercase">
+                        {isOwner ? 'Lucro Direto' : colab.tipo === 'Parceria' ? 'Custo Parceria' : 'Perda Aceitável Equipe'}
+                      </p>
                     </div>
-                    <p className="text-[10px] text-zinc-500 font-bold uppercase">{isOwner ? 'Lucro Direto' : 'Perda Aceitável Equipe'}</p>
+                    <div className="text-right">
+                      <p className={cn("text-sm font-bold", isOwner ? "text-emerald-700" : "text-zinc-900")}>
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalColab)}
+                      </p>
+                      <p className="text-[10px] text-zinc-400 font-medium">
+                        {colabDists.reduce((acc, d) => acc + d.quantidade, 0)} itens totais
+                      </p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className={cn("text-sm font-bold", isOwner ? "text-emerald-700" : "text-zinc-900")}>
-                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalColab)}
-                    </p>
-                    <p className="text-[10px] text-zinc-400 font-medium">
-                      {colabDists.reduce((acc, d) => acc + d.quantidade, 0)} itens totais
-                    </p>
+
+                  <div className="border-t border-zinc-200/50 pt-3 space-y-3">
+                    {colabDists.map(dist => {
+                      const concluida = dist.quantidade_concluida || 0;
+                      const paga = dist.quantidade_paga || 0;
+                      const aPagar = (concluida - paga) * dist.valor_unitario;
+
+                      return (
+                        <div key={dist.id} className={cn(
+                          "flex flex-col gap-2 p-2 rounded-sm border",
+                          !isOwner && aPagar > 0 ? "bg-rose-50/50 border-rose-100" : 
+                          !isOwner && concluida > 0 && aPagar === 0 ? "bg-emerald-50/50 border-emerald-100" : 
+                          "bg-white/50 border-zinc-100"
+                        )}>
+                          <div className="flex justify-between items-center text-xs font-bold text-zinc-700">
+                            <div className="flex items-center gap-2">
+                              <span>{dist.tipo_demanda} ({dist.quantidade} un.)</span>
+                              {!isOwner && concluida > 0 && (
+                                aPagar > 0 ? (
+                                  <span className="text-[8px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded-full uppercase">Pendente</span>
+                                ) : (
+                                  <span className="text-[8px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full uppercase">Pago</span>
+                                )
+                              )}
+                            </div>
+                            <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(dist.valor_total)}</span>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <div className="flex-1">
+                              <label className="text-[10px] text-zinc-500 uppercase block mb-1">Concluídas</label>
+                              <input 
+                                type="number" 
+                                max={dist.quantidade} 
+                                min={0} 
+                                value={concluida} 
+                                onChange={(e) => updateDistProgress(dist.id, 'quantidade_concluida', e.target.value)} 
+                                className="w-full text-xs p-1.5 border border-zinc-200 rounded-none focus:ring-1 focus:ring-[#c11720] outline-none font-bold" 
+                              />
+                            </div>
+                            {!isOwner && (
+                              <div className="flex-1">
+                                <label className="text-[10px] text-zinc-500 uppercase block mb-1">Pagas</label>
+                                <input 
+                                  type="number" 
+                                  max={concluida} 
+                                  min={0} 
+                                  value={paga} 
+                                  onChange={(e) => updateDistProgress(dist.id, 'quantidade_paga', e.target.value)} 
+                                  className="w-full text-xs p-1.5 border border-zinc-200 rounded-none focus:ring-1 focus:ring-[#c11720] outline-none font-bold" 
+                                />
+                              </div>
+                            )}
+                          </div>
+                          {!isOwner && aPagar > 0 && (
+                            <div className="text-[10px] text-right font-bold text-rose-600 mt-1">
+                              A Pagar: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(aPagar)}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );
@@ -425,7 +525,7 @@ const ContractDetails = () => {
           </div>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        <div className="flex flex-wrap justify-center gap-6">
           {mergedDemandas.map(d => {
             const distsForType = distribuicoes.filter(dist => dist.tipo_demanda === d.tipo_demanda);
             const totalDist = distsForType.reduce((acc, dist) => acc + dist.quantidade, 0);
@@ -434,7 +534,7 @@ const ContractDetails = () => {
 
             return (
               <div key={d.id} className={cn(
-                "p-5 border rounded-none space-y-4 transition-all",
+                "w-full md:w-[calc(50%-12px)] xl:w-[calc(33.333%-16px)] p-5 border rounded-none space-y-4 transition-all",
                 isConfigured 
                   ? "bg-white border-zinc-100 shadow-sm hover:border-zinc-200" 
                   : "bg-zinc-50/50 border-zinc-100 opacity-75"
@@ -459,7 +559,7 @@ const ContractDetails = () => {
                         onClick={() => {
                           const currentDists = distribuicoes
                             .filter(dist => dist.tipo_demanda === d.tipo_demanda)
-                            .map(dist => ({ id: dist.id, colabId: dist.colaborador_id, qtd: dist.quantidade }));
+                            .map(dist => ({ id: dist.id, colabId: dist.colaborador_id, qtd: dist.quantidade, valor_total: dist.valor_total }));
                           
                           setEditingDemandaData({ 
                             id: d.id, 
@@ -656,6 +756,23 @@ const ContractDetails = () => {
                           }}
                         />
                       </div>
+                      {colaboradores.find(c => c.id === dist.colabId)?.tipo === 'Parceria' && (
+                        <div className="w-32">
+                          <label className="text-[10px] font-bold text-zinc-400 uppercase">Valor (R$)</label>
+                          <input 
+                            type="number" 
+                            step="0.01"
+                            className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-none mt-1 text-sm"
+                            value={dist.valor_total || ''}
+                            onChange={e => {
+                              const val = parseFloat(e.target.value);
+                              const newDists = [...editingDemandaData.dists];
+                              newDists[index].valor_total = isNaN(val) ? 0 : val;
+                              setEditingDemandaData({...editingDemandaData, dists: newDists});
+                            }}
+                          />
+                        </div>
+                      )}
                       <button 
                         onClick={() => {
                           if (dist.id) {

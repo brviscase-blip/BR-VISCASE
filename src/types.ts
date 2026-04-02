@@ -10,7 +10,7 @@ export type Pacote =
 export type StatusContrato = "Ativo" | "Inativo" | "Encerrado";
 export type StatusPagamento = "Pendente" | "Pago" | "Atrasado";
 export type TipoDemanda = "Criativo" | "Carrossel" | "Gestão de Conteúdo" | "Captação" | "Vídeo";
-export type TipoColaborador = "Equipe" | "Proprietário";
+export type TipoColaborador = "Equipe" | "Proprietário" | "Parceria";
 
 export interface Contrato {
   id: string;
@@ -52,6 +52,8 @@ export interface DistribuicaoDemanda {
   quantidade: number;
   valor_unitario: number;
   valor_total: number;
+  quantidade_concluida?: number;
+  quantidade_paga?: number;
 }
 
 export const PRECOS_DEMANDAS: Record<TipoDemanda, number> = {
