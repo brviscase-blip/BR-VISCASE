@@ -192,7 +192,7 @@ const Team = () => {
                 <div className="flex justify-between items-start mb-6">
                   <div className={cn(
                     "w-14 h-14 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 duration-300",
-                    isOwner ? "bg-[#c11720] text-white" : colab.tipo === 'Parceria' ? "bg-[#7b564d] text-white" : "bg-zinc-100 text-zinc-600"
+                    isOwner ? "bg-[#c11720] text-white" : colab.tipo === 'Parceria' ? "bg-[#0c3249] text-white" : "bg-zinc-100 text-zinc-600"
                   )}>
                     {isOwner ? <Briefcase size={28} /> : colab.tipo === 'Parceria' ? <Handshake size={28} /> : <UserIcon size={28} />}
                   </div>

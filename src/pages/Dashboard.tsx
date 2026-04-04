@@ -171,7 +171,7 @@ const Dashboard = () => {
 
   const chartData = [
     { name: 'Receita Bruta', value: stats.totalGross, color: '#F2F2F2' },
-    { name: 'Receita Líquida', value: stats.totalNet, color: '#7b564d' },
+    { name: 'Receita Líquida', value: stats.totalNet, color: '#0c3249' },
     { name: 'Perda Aceitável', value: stats.totalCosts, color: '#c11720' },
   ];
 
@@ -195,7 +195,7 @@ const Dashboard = () => {
           title="Receita Líquida Mensal" 
           value={new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.totalNet)}
           icon={TrendingUp}
-          color="bg-[#7b564d] text-white"
+          color="bg-[#0c3249] text-white"
           trend="up"
           trendValue={`${stats.totalGross > 0 ? ((stats.totalNet / stats.totalGross) * 100).toFixed(1) : '0.0'}%`}
         />
@@ -208,7 +208,7 @@ const Dashboard = () => {
           }
           subValue="Meta: ≥ 70%"
           icon={BarChart3}
-          color="bg-[#7b564d] text-white"
+          color="bg-[#0c3249] text-white"
           trend={stats.medianMargin >= 70 ? 'up' : 'down'}
           trendValue={stats.medianMargin >= 70 ? 'No Alvo' : 'Abaixo'}
         />
@@ -217,21 +217,26 @@ const Dashboard = () => {
           value={stats.contractsAtRisk}
           subValue="Perda > 30%"
           icon={AlertCircle}
-          color="bg-[#7b564d] text-white"
+          color="bg-[#0c3249] text-white"
           onClick={() => stats.contractsAtRisk > 0 && setShowAtRiskModal(true)}
         />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-white p-8 rounded-none border border-zinc-100 shadow-sm min-h-[450px]">
-          <h3 className="text-xl font-bold mb-8 text-[#c11720]">Performance Financeira Consolidada</h3>
-          <div className="h-[349px] w-full flex items-center justify-center mt-[-30px]">
+        <div className="lg:col-span-2 bg-white p-8 rounded-none border border-zinc-100 shadow-sm min-h-[450px] flex flex-col">
+          <h3 className="text-xl font-bold mb-6 text-[#c11720]">Performance Financeira Consolidada</h3>
+          <div className="flex-1 w-full flex items-center justify-center">
             {isMounted && (
-              <ResponsiveContainer width="100%" height={349}>
-                <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 40, right: 30, left: 20, bottom: 20 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f1f1" />
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#71717a', fontSize: 14 }} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#71717a', fontSize: 14 }} />
+                  <YAxis 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fill: '#71717a', fontSize: 14 }} 
+                    domain={[0, (dataMax: number) => Math.ceil(dataMax * 1.2 / 100) * 100]}
+                  />
                   <Tooltip 
                     cursor={{ fill: '#f8f9fa' }}
                     contentStyle={{ borderRadius: '0', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', fontSize: '14px' }}
@@ -240,6 +245,12 @@ const Dashboard = () => {
                     {chartData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
+                    <LabelList 
+                      dataKey="value" 
+                      position="top" 
+                      formatter={(value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(value)}
+                      style={{ fontSize: '12px', fontWeight: 'bold', fill: '#71717a' }}
+                    />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -247,13 +258,13 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className="bg-white p-8 rounded-none border border-zinc-100 shadow-sm flex flex-col">
+        <div className="bg-white p-8 rounded-none border border-zinc-100 shadow-sm flex flex-col min-h-[450px]">
           <h3 className="text-xl font-bold mb-2 text-[#c11720]">Distribuição de Receita Líquida</h3>
-          <p className="text-sm text-zinc-500 mb-8">Mediana de perda aceitável: {stats.medianLoss.toFixed(1)}%</p>
+          <p className="text-sm text-zinc-500 mb-6">Mediana de perda aceitável: {stats.medianLoss.toFixed(1)}%</p>
           
-          <div className="flex-1 flex items-center justify-center relative min-h-[250px] w-full">
+          <div className="flex-1 flex items-center justify-center relative w-full">
             {isMounted && (
-              <ResponsiveContainer width="100%" height={250} minHeight={250}>
+              <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={[
@@ -264,8 +275,9 @@ const Dashboard = () => {
                     outerRadius={80}
                     paddingAngle={5}
                     dataKey="value"
+                    label={({ name, value }) => `${value.toFixed(1)}%`}
                   >
-                    <Cell fill="#7b564d" />
+                    <Cell fill="#0c3249" />
                     <Cell fill="#c11720" />
                   </Pie>
                   <Tooltip />
@@ -291,7 +303,7 @@ const Dashboard = () => {
             </li>
             <li className="flex justify-between items-center text-sm">
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-none bg-[#7b564d]" />
+                <div className="w-3 h-3 rounded-none bg-[#0c3249]" />
                 <span className="text-zinc-600">Receita Líquida</span>
               </div>
               <span className={`font-bold ${stats.medianMargin >= 75 ? 'text-emerald-600' : 'text-rose-600'}`}>
@@ -342,33 +354,33 @@ const Dashboard = () => {
           <div className="h-[450px] w-full">
             {isMounted && (
               <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart 
-                  data={stats.contractStats.map((s: any) => ({
-                    name: s.contract.nome,
-                    bruto: s.contract.valor_bruto,
-                    liquido: s.net,
-                    parceiro: s.contract.tem_parceria ? s.contract.valor_parceiro : 0,
-                    perda: s.loss
-                  }))}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f1f1" />
-                  <XAxis 
-                    dataKey="name" 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fill: '#71717a', fontSize: 11, fontWeight: 600 }} 
-                    angle={-45}
-                    textAnchor="end"
-                    interval={0}
-                  />
-                  <YAxis 
-                    yAxisId="left"
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fill: '#71717a', fontSize: 12 }} 
-                    tickFormatter={(value) => `R$ ${value}`}
-                  />
+                  <ComposedChart 
+                    data={stats.contractStats.map((s: any) => ({
+                      name: s.contract.nome,
+                      bruto: s.contract.valor_bruto,
+                      liquido: s.net,
+                      parceiro: s.contract.tem_parceria ? s.contract.valor_parceiro : 0,
+                      perda: s.loss
+                    }))}
+                    margin={{ top: 40, right: 30, left: 10, bottom: 20 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f1f1" />
+                    <XAxis 
+                      dataKey="name" 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fill: '#71717a', fontSize: 11, fontWeight: 600 }} 
+                      interval={0}
+                    />
+                    <YAxis 
+                      yAxisId="left"
+                      width={80}
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fill: '#71717a', fontSize: 12 }} 
+                      tickFormatter={(value) => `R$ ${value}`}
+                      domain={[0, (dataMax: number) => Math.ceil(dataMax * 1.2 / 100) * 100]}
+                    />
                   <YAxis 
                     yAxisId="right"
                     orientation="right"
@@ -408,12 +420,12 @@ const Dashboard = () => {
                       style={{ fontSize: '10px', fontWeight: 'bold', fill: '#71717a' }}
                     />
                   </Bar>
-                  <Bar yAxisId="left" dataKey="liquido" name="Receita Líquida" fill="#7b564d" barSize={40}>
+                  <Bar yAxisId="left" dataKey="liquido" name="Receita Líquida" fill="#0c3249" barSize={40}>
                     <LabelList 
                       dataKey="liquido" 
                       position="top" 
                       formatter={(value: number) => `R$ ${value}`}
-                      style={{ fontSize: '10px', fontWeight: 'bold', fill: '#7b564d' }}
+                      style={{ fontSize: '10px', fontWeight: 'bold', fill: '#0c3249' }}
                     />
                   </Bar>
                   <Bar yAxisId="left" dataKey="parceiro" name="Valor Parceiro" fill="#fffbeb" barSize={40}>
@@ -435,10 +447,16 @@ const Dashboard = () => {
                     activeDot={{ r: 6 }}
                     label={(props: any) => {
                       const { x, y, value } = props;
+                      // Se o ponto estiver na parte superior do gráfico (y < 200), 
+                      // posiciona o label abaixo do ponto para evitar colisão com o topo das barras
+                      const isHigh = y < 200;
+                      const rectY = isHigh ? y + 10 : y - 25;
+                      const textY = isHigh ? y + 22 : y - 13;
+                      
                       return (
                         <g>
-                          <rect x={x - 20} y={y - 25} width={40} height={16} fill="#c11720" rx={4} />
-                          <text x={x} y={y - 13} textAnchor="middle" fill="#fff" fontSize="10px" fontWeight="bold">
+                          <rect x={x - 20} y={rectY} width={40} height={16} fill="#c11720" rx={4} />
+                          <text x={x} y={textY} textAnchor="middle" fill="#fff" fontSize="10px" fontWeight="bold">
                             {value.toFixed(1)}%
                           </text>
                         </g>
@@ -454,11 +472,11 @@ const Dashboard = () => {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-zinc-100">
-                  <th className="pb-4 text-xs font-bold text-[#7b564d] uppercase tracking-wider">Contrato</th>
-                  <th className="pb-4 text-xs font-bold text-[#7b564d] uppercase tracking-wider">Receita Bruta</th>
-                  <th className="pb-4 text-xs font-bold text-[#7b564d] uppercase tracking-wider">Receita Líquida</th>
-                  <th className="pb-4 text-xs font-bold text-[#7b564d] uppercase tracking-wider">Valor Parceiro</th>
-                  <th className="pb-4 text-xs font-bold text-[#7b564d] uppercase tracking-wider">Perda Aceitável</th>
+                  <th className="pb-4 text-xs font-bold text-[#0c3249] uppercase tracking-wider">Contrato</th>
+                  <th className="pb-4 text-xs font-bold text-[#0c3249] uppercase tracking-wider">Receita Bruta</th>
+                  <th className="pb-4 text-xs font-bold text-[#0c3249] uppercase tracking-wider">Receita Líquida</th>
+                  <th className="pb-4 text-xs font-bold text-[#0c3249] uppercase tracking-wider">Valor Parceiro</th>
+                  <th className="pb-4 text-xs font-bold text-[#0c3249] uppercase tracking-wider">Perda Aceitável</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100">

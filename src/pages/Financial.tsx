@@ -117,8 +117,8 @@ const Financial = () => {
                       <stop offset="95%" stopColor="#F2F2F2" stopOpacity={0}/>
                     </linearGradient>
                     <linearGradient id="colorNet" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#7b564d" stopOpacity={0.1}/>
-                      <stop offset="95%" stopColor="#7b564d" stopOpacity={0}/>
+                      <stop offset="5%" stopColor="#0c3249" stopOpacity={0.1}/>
+                      <stop offset="95%" stopColor="#0c3249" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f1f1" />
@@ -129,7 +129,7 @@ const Financial = () => {
                   />
                   <Legend verticalAlign="top" align="right" height={36} iconType="circle" />
                   <Area type="monotone" dataKey="gross" name="Receita Bruta" stroke="#F2F2F2" fillOpacity={1} fill="url(#colorGross)" strokeWidth={3} />
-                  <Area type="monotone" dataKey="net" name="Receita Líquida" stroke="#7b564d" fillOpacity={1} fill="url(#colorNet)" strokeWidth={3} />
+                  <Area type="monotone" dataKey="net" name="Receita Líquida" stroke="#0c3249" fillOpacity={1} fill="url(#colorNet)" strokeWidth={3} />
                 </AreaChart>
               </ResponsiveContainer>
             )}
@@ -178,7 +178,7 @@ const Financial = () => {
                   <td className="py-5 font-bold text-zinc-900">{data.month}</td>
                   <td className="py-5 text-zinc-600">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(data.gross)}</td>
                   <td className="py-5 text-[#c11720] font-medium">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(data.costs)}</td>
-                  <td className="py-5 text-[#7b564d] font-bold">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(data.net)}</td>
+                  <td className="py-5 text-[#0c3249] font-bold">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(data.net)}</td>
                   <td className="py-5">
                     <span className={`px-3 py-1 rounded-full text-xs font-bold ${data.margin >= 70 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-[#c11720]'}`}>
                       {data.margin}%

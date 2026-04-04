@@ -227,14 +227,14 @@ const Contracts = () => {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-zinc-50/50">
-                <th className="px-6 py-4 text-xs font-bold text-[#7b564d] uppercase tracking-wider">Contrato</th>
-                <th className="px-6 py-4 text-xs font-bold text-[#7b564d] uppercase tracking-wider">Demandas</th>
-                <th className="px-6 py-4 text-xs font-bold text-[#7b564d] uppercase tracking-wider">Valor Bruto</th>
-                <th className="px-6 py-4 text-xs font-bold text-[#7b564d] uppercase tracking-wider">Valor Líquido</th>
-                <th className="px-6 py-4 text-xs font-bold text-[#7b564d] uppercase tracking-wider">Receita Líquida</th>
-                <th className="px-6 py-4 text-xs font-bold text-[#7b564d] uppercase tracking-wider">Pagamentos</th>
-                <th className="px-6 py-4 text-xs font-bold text-[#7b564d] uppercase tracking-wider" style={{ paddingLeft: '29px', paddingRight: '24px' }}>Status</th>
-                <th className="px-6 py-4 text-xs font-bold text-[#7b564d] uppercase tracking-wider text-right">Ações</th>
+                <th className="px-6 py-4 text-xs font-bold text-[#0c3249] uppercase tracking-wider">Contrato</th>
+                <th className="px-6 py-4 text-xs font-bold text-[#0c3249] uppercase tracking-wider">Demandas</th>
+                <th className="px-6 py-4 text-xs font-bold text-[#0c3249] uppercase tracking-wider">Valor Bruto</th>
+                <th className="px-6 py-4 text-xs font-bold text-[#0c3249] uppercase tracking-wider">Valor Líquido</th>
+                <th className="px-6 py-4 text-xs font-bold text-[#0c3249] uppercase tracking-wider">Receita Líquida</th>
+                <th className="px-6 py-4 text-xs font-bold text-[#0c3249] uppercase tracking-wider">Pagamentos</th>
+                <th className="px-6 py-4 text-xs font-bold text-[#0c3249] uppercase tracking-wider" style={{ paddingLeft: '29px', paddingRight: '24px' }}>Status</th>
+                <th className="px-6 py-4 text-xs font-bold text-[#0c3249] uppercase tracking-wider text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100">
@@ -264,7 +264,7 @@ const Contracts = () => {
                   >
                     <td className="px-6 py-5">
                       <div className="font-bold text-[#c11720] group-hover:text-red-700" style={{ fontFamily: 'Arial' }}>{contract.nome}</div>
-                      <div className="text-xs text-[#7b564d] font-bold">{contract.pacote}</div>
+                      <div className="text-xs text-[#0c3249] font-bold">{contract.pacote}</div>
                       <div className="text-[11px] text-zinc-400">Início: {contract.created_at ? format(contract.created_at.toDate(), 'dd/MM/yyyy') : 'N/A'}</div>
                     </td>
                     <td className="px-6 py-5">
