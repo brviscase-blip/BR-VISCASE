@@ -260,7 +260,7 @@ const Contracts = () => {
                   <tr 
                     key={contract.id} 
                     className="hover:bg-zinc-50/50 transition-colors cursor-pointer group"
-                    onClick={() => navigate(`/contracts/${contract.id}`)}
+                    onClick={() => navigate(`/contratos/${contract.id}`)}
                   >
                     <td className="px-6 py-5">
                       <div className="font-bold text-[#c11720] group-hover:text-red-700" style={{ fontFamily: 'Arial' }}>{contract.nome}</div>
@@ -306,7 +306,7 @@ const Contracts = () => {
                     <td className="px-6 py-5 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-2">
                         <button 
-                          onClick={() => navigate(`/contracts/${contract.id}`)}
+                          onClick={() => navigate(`/contratos/${contract.id}`)}
                           className="p-2 text-zinc-400 hover:text-black hover:bg-zinc-100 rounded-xl transition-all"
                         >
                           <Eye size={18} />

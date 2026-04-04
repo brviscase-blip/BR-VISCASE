@@ -50,6 +50,7 @@ const ContractDetails = () => {
   const [distsToDelete, setDistsToDelete] = useState<string[]>([]);
   const [newDist, setNewDist] = useState({ colabId: '', tipo: 'Criativo' as TipoDemanda, qtd: 0 });
   const [paymentValues, setPaymentValues] = useState<{ [key: string]: string }>({});
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -62,9 +63,10 @@ const ContractDetails = () => {
         let v1 = data.valor_pagamento_1q || 0;
         let v2 = data.valor_pagamento_2q || 0;
         
-        // Automatic estimation: if both are 0 and there's a gross value, split it
-        if (v1 === 0 && v2 === 0 && data.valor_bruto > 0) {
-          const estimate = data.valor_bruto / 2;
+        // Automatic estimation: if both are 0 and there's a total value, split it
+        const totalValue = data.valor_total_cliente || data.valor_bruto; // Fallback to valor_bruto for older contracts
+        if (v1 === 0 && v2 === 0 && totalValue > 0) {
+          const estimate = totalValue / 2;
           await updateDoc(doc(db, 'contratos', id), {
             valor_pagamento_1q: estimate,
             valor_pagamento_2q: estimate
@@ -117,7 +119,42 @@ const ContractDetails = () => {
 
   const handleUpdateDemanda = async () => {
     if (!editingDemandaData || editingDemandaData.qtd < 0) return;
+
+    // Validação de Quantidade Total
+    const totalAssignedQtd = editingDemandaData.dists.reduce((acc, d) => acc + d.qtd, 0);
+    if (totalAssignedQtd > editingDemandaData.qtd) {
+      setValidationError(`A quantidade total atribuída (${totalAssignedQtd}) não pode ser maior que a quantidade total da demanda (${editingDemandaData.qtd}).`);
+      return;
+    }
+
+    // Validação de Valor do Parceiro
+    if (contract?.tem_parceria && contract.parceiro_id && contract.valor_parceiro) {
+      const originalType = demandas.find(d => d.id === editingDemandaData.id)?.tipo_demanda;
+      
+      const otherDemandsPartnerTotal = distribuicoes
+        .filter(d => d.colaborador_id === contract.parceiro_id && d.tipo_demanda !== originalType)
+        .reduce((acc, d) => acc + (d.valor_total || 0), 0);
+
+      const currentDemandPartnerTotal = editingDemandaData.dists
+        .filter(d => d.colabId === contract.parceiro_id)
+        .reduce((acc, d) => {
+          const valorUnit = PRECOS_DEMANDAS[editingDemandaData.tipo];
+          const colab = colaboradores.find(c => c.id === d.colabId);
+          const isParceria = colab?.tipo === 'Parceria';
+          const finalValorTotal = isParceria ? (d.valor_total || 0) : (d.qtd * valorUnit);
+          return acc + finalValorTotal;
+        }, 0);
+
+      const totalPartnerValue = otherDemandsPartnerTotal + currentDemandPartnerTotal;
+
+      if (totalPartnerValue > contract.valor_parceiro + 0.01) {
+        const diff = totalPartnerValue - contract.valor_parceiro;
+        setValidationError(`O valor total das demandas atribuídas ao parceiro (${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalPartnerValue)}) excede o valor fixo do contrato (${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(contract.valor_parceiro)}). Excesso: ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(diff)}`);
+        return;
+      }
+    }
     
+    setValidationError(null);
     const dataToSave = { ...editingDemandaData };
     const distsToDeleteNow = [...distsToDelete];
     
@@ -235,12 +272,13 @@ const ContractDetails = () => {
     const value = paymentValues[field];
     const numValue = Number(value.replace(/\D/g, '')) / 100;
     
-    // Validation: Sum of payments cannot exceed gross value
+    // Validation: Sum of payments cannot exceed total value
     const otherField = field === 'valor_pagamento_1q' ? 'valor_pagamento_2q' : 'valor_pagamento_1q';
     const otherValue = Number(contract[otherField] || 0);
+    const totalValue = contract.valor_total_cliente || contract.valor_bruto;
     
-    if (numValue + otherValue > contract.valor_bruto) {
-      alert(`O valor total das quinzenas (${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(numValue + otherValue)}) não pode exceder o valor bruto do contrato (${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(contract.valor_bruto)}).`);
+    if (numValue + otherValue > totalValue) {
+      alert(`O valor total das quinzenas (${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(numValue + otherValue)}) não pode exceder o valor total do contrato (${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalValue)}).`);
       // Reset local value to Firestore value
       setPaymentValues(prev => ({
         ...prev,
@@ -294,7 +332,7 @@ const ContractDetails = () => {
   return (
     <div className="space-y-10 animate-fade-in">
       <button 
-        onClick={() => navigate('/contracts')}
+        onClick={() => navigate('/contratos')}
         className="flex items-center gap-2 text-zinc-500 hover:text-black transition-colors font-medium"
       >
         <ArrowLeft size={20} />
@@ -425,61 +463,52 @@ const ContractDetails = () => {
             Demandas por Equipe
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Show main partner if exists */}
-            {contract.tem_parceria && contract.parceiro_id && (
-              <div className="bg-amber-50 border border-amber-100 p-4 rounded-none flex flex-col gap-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="font-bold text-zinc-900">
-                        {colaboradores.find(c => c.id === contract.parceiro_id)?.nome || 'Parceiro'}
-                      </p>
-                      <span className="text-[8px] bg-amber-500 text-white px-1.5 py-0.5 rounded-full font-bold uppercase">Parceiro Principal</span>
-                    </div>
-                    <p className="text-[10px] text-zinc-500 font-bold uppercase">
-                      Repasse Direto
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-bold text-amber-700">
-                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(contract.valor_parceiro || 0)}
-                    </p>
-                    <p className="text-[10px] text-zinc-400 font-medium">
-                      Valor Fixo
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {colaboradores.filter(c => distribuicoes.some(d => d.colaborador_id === c.id) && (!contract.tem_parceria || c.id !== contract.parceiro_id)).map(colab => {
+            {colaboradores.filter(c => distribuicoes.some(d => d.colaborador_id === c.id)).map(colab => {
               const colabDists = distribuicoes.filter(d => d.colaborador_id === colab.id);
               const totalColab = colabDists.reduce((acc, d) => acc + d.valor_total, 0);
               const isOwner = colab.tipo === 'Proprietário';
+              const isPartner = contract.tem_parceria && colab.id === contract.parceiro_id;
+              const isOverBudget = isPartner && totalColab > (contract.valor_parceiro || 0) + 0.01;
               
               return (
                 <div key={colab.id} className={cn(
                   "p-4 rounded-none border flex flex-col gap-4",
-                  isOwner ? "bg-emerald-50 border-emerald-100" : "bg-zinc-50 border-transparent"
+                  isPartner ? "bg-amber-50 border-amber-100" : 
+                  isOwner ? "bg-emerald-50 border-emerald-100" : 
+                  "bg-zinc-50 border-transparent"
                 )}>
                   <div className="flex items-center justify-between">
                     <div>
                       <div className="flex items-center gap-2">
                         <p className="font-bold text-zinc-900">{colab.nome}</p>
+                        {isPartner && (
+                          <span className="text-[8px] bg-amber-500 text-white px-1.5 py-0.5 rounded-full font-bold uppercase">Parceiro Principal</span>
+                        )}
                         {isOwner && (
                           <span className="text-[8px] bg-emerald-500 text-white px-1.5 py-0.5 rounded-full font-bold uppercase">Proprietário</span>
                         )}
                       </div>
                       <p className="text-[10px] text-zinc-500 font-bold uppercase">
-                        {isOwner ? 'Lucro Direto' : colab.tipo === 'Parceria' ? 'Custo Parceria' : 'Perda Aceitável Equipe'}
+                        {isPartner ? 'Repasse Direto' : isOwner ? 'Lucro Direto' : 'Perda Aceitável Equipe'}
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className={cn("text-sm font-bold", isOwner ? "text-emerald-700" : "text-zinc-900")}>
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalColab)}
-                      </p>
+                      <div className="flex items-center justify-end gap-1">
+                        <p className={cn(
+                          "text-sm font-bold", 
+                          isPartner ? (isOverBudget ? "text-rose-600" : "text-amber-700") :
+                          isOwner ? "text-emerald-700" : 
+                          "text-zinc-900"
+                        )}>
+                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalColab)}
+                        </p>
+                        {isOverBudget && <AlertCircle size={14} className="text-rose-500" />}
+                      </div>
                       <p className="text-[10px] text-zinc-400 font-medium">
-                        {colabDists.reduce((acc, d) => acc + d.quantidade, 0)} itens totais
+                        {isPartner 
+                          ? `Valor Fixo: ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(contract.valor_parceiro || 0)}` 
+                          : `${colabDists.reduce((acc, d) => acc + d.quantidade, 0)} itens totais`
+                        }
                       </p>
                     </div>
                   </div>
@@ -573,6 +602,10 @@ const ContractDetails = () => {
             const totalDist = distsForType.reduce((acc, dist) => acc + dist.quantidade, 0);
             const isConfigured = d.quantidade_total > 0;
             const isFullyDistributed = totalDist >= d.quantidade_total && isConfigured;
+            
+            // Calculate total cost for this demand: sum of distributions + remaining quantity * default price
+            const remainingQtd = Math.max(0, d.quantidade_total - totalDist);
+            const totalCustoForType = distsForType.reduce((acc, dist) => acc + (dist.valor_total || 0), 0) + (remainingQtd * PRECOS_DEMANDAS[d.tipo_demanda]);
 
             return (
               <div key={d.id} className={cn(
@@ -631,7 +664,7 @@ const ContractDetails = () => {
                       <>
                         <p className="text-xs text-zinc-400 font-bold uppercase mb-1">Custo Total</p>
                         <p className="text-sm font-bold text-[#c11720]">
-                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(d.quantidade_total * PRECOS_DEMANDAS[d.tipo_demanda])}
+                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalCustoForType)}
                         </p>
                       </>
                     )}
@@ -706,6 +739,7 @@ const ContractDetails = () => {
                   type="number" 
                   className="w-full px-4 py-3 bg-zinc-50 border-none rounded-none mt-1"
                   value={newDemanda.qtd}
+                  onFocus={e => e.target.select()}
                   onChange={e => {
                     const val = parseInt(e.target.value);
                     setNewDemanda({...newDemanda, qtd: isNaN(val) ? 0 : val});
@@ -743,6 +777,7 @@ const ContractDetails = () => {
                     type="number" 
                     className="w-full px-4 py-3 bg-zinc-50 border-none rounded-none mt-1"
                     value={editingDemandaData.qtd}
+                    onFocus={e => e.target.select()}
                     onChange={e => {
                       const val = parseInt(e.target.value);
                       setEditingDemandaData({...editingDemandaData, qtd: isNaN(val) ? 0 : val});
@@ -790,6 +825,7 @@ const ContractDetails = () => {
                           type="number" 
                           className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-none mt-1 text-sm"
                           value={dist.qtd}
+                          onFocus={e => e.target.select()}
                           onChange={e => {
                             const val = parseInt(e.target.value);
                             const newDists = [...editingDemandaData.dists];
@@ -806,6 +842,7 @@ const ContractDetails = () => {
                             step="0.01"
                             className="w-full px-3 py-2 bg-white border border-zinc-200 rounded-none mt-1 text-sm"
                             value={dist.valor_total || ''}
+                            onFocus={e => e.target.select()}
                             onChange={e => {
                               const val = parseFloat(e.target.value);
                               const newDists = [...editingDemandaData.dists];
@@ -835,8 +872,15 @@ const ContractDetails = () => {
                 </div>
               </div>
 
+              {validationError && (
+                <div className="p-3 bg-rose-50 border border-rose-100 rounded-none flex items-start gap-2 animate-pulse">
+                  <AlertCircle size={16} className="text-rose-500 shrink-0 mt-0.5" />
+                  <p className="text-xs text-rose-700 font-bold leading-tight">{validationError}</p>
+                </div>
+              )}
+
               <div className="flex gap-3 pt-4">
-                <button onClick={() => { setIsEditingDemanda(false); setEditingDemandaData(null); }} className="flex-1 py-3 bg-zinc-100 rounded-none font-bold">Cancelar</button>
+                <button onClick={() => { setIsEditingDemanda(false); setEditingDemandaData(null); setValidationError(null); }} className="flex-1 py-3 bg-zinc-100 rounded-none font-bold">Cancelar</button>
                 <button onClick={handleUpdateDemanda} className="flex-1 py-3 bg-black text-white rounded-none font-bold">Salvar Alterações</button>
               </div>
             </div>
@@ -904,6 +948,7 @@ const ContractDetails = () => {
                   type="number" 
                   className="w-full px-4 py-3 bg-zinc-50 border-none rounded-none mt-1"
                   value={newDist.qtd}
+                  onFocus={e => e.target.select()}
                   onChange={e => {
                     const val = parseInt(e.target.value);
                     setNewDist({...newDist, qtd: isNaN(val) ? 0 : val});

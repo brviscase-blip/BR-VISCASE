@@ -70,7 +70,7 @@ const Layout = ({ children, user }: { children: React.ReactNode, user: User }) =
 
             <nav className="hidden lg:flex items-center gap-4">
               <NavItem to="/" icon={LayoutDashboard} label="Dashboard" active={location.pathname === "/"} />
-              <NavItem to="/contracts" icon={FileText} label="Contratos" active={location.pathname.startsWith("/contracts")} />
+              <NavItem to="/contratos" icon={FileText} label="Contratos" active={location.pathname.startsWith("/contratos")} />
               <NavItem to="/team" icon={Users} label="Equipe" active={location.pathname === "/team"} />
               <NavItem to="/financial" icon={DollarSign} label="Financeiro" active={location.pathname === "/financial"} />
             </nav>
@@ -111,7 +111,7 @@ const Layout = ({ children, user }: { children: React.ReactNode, user: User }) =
       {isMobileMenuOpen && (
         <div className="lg:hidden fixed inset-0 bg-white z-40 pt-24 px-6 flex flex-col gap-2">
           <NavItem to="/" icon={LayoutDashboard} label="Dashboard" active={location.pathname === "/"} onClick={() => setIsMobileMenuOpen(false)} />
-          <NavItem to="/contracts" icon={FileText} label="Contratos" active={location.pathname.startsWith("/contracts")} onClick={() => setIsMobileMenuOpen(false)} />
+          <NavItem to="/contratos" icon={FileText} label="Contratos" active={location.pathname.startsWith("/contratos")} onClick={() => setIsMobileMenuOpen(false)} />
           <NavItem to="/team" icon={Users} label="Equipe" active={location.pathname === "/team"} onClick={() => setIsMobileMenuOpen(false)} />
           <NavItem to="/financial" icon={DollarSign} label="Financeiro" active={location.pathname === "/financial"} onClick={() => setIsMobileMenuOpen(false)} />
           <hr className="my-4 border-zinc-100" />
@@ -190,8 +190,8 @@ export default function App() {
       <Layout user={user}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
-          <Route path="/contracts" element={<Contracts />} />
-          <Route path="/contracts/:id" element={<ContractDetails />} />
+          <Route path="/contratos" element={<Contracts />} />
+          <Route path="/contratos/:id" element={<ContractDetails />} />
           <Route path="/team" element={<Team />} />
           <Route path="/financial" element={<Financial />} />
         </Routes>
