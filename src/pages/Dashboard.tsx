@@ -433,11 +433,16 @@ const Dashboard = () => {
                     strokeWidth={3} 
                     dot={{ r: 4, fill: '#c11720', strokeWidth: 2, stroke: '#fff' }}
                     activeDot={{ r: 6 }}
-                    label={{ 
-                      position: 'top', 
-                      formatter: (value: number) => `${value.toFixed(1)}%`,
-                      style: { fontSize: '10px', fontWeight: 'bold', fill: '#c11720' },
-                      dy: -10
+                    label={(props: any) => {
+                      const { x, y, value } = props;
+                      return (
+                        <g>
+                          <rect x={x - 20} y={y - 25} width={40} height={16} fill="#c11720" rx={4} />
+                          <text x={x} y={y - 13} textAnchor="middle" fill="#fff" fontSize="10px" fontWeight="bold">
+                            {value.toFixed(1)}%
+                          </text>
+                        </g>
+                      );
                     }}
                   />
                 </ComposedChart>
