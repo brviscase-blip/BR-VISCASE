@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
-import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, User } from 'firebase/auth';
-import { auth, db } from './firebase';
+import React, { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { 
   LayoutDashboard, 
   FileText, 
@@ -12,20 +11,25 @@ import {
   Menu, 
   X, 
   ChevronRight,
+  ChevronLeft,
   TrendingUp,
   AlertCircle,
   CheckCircle2,
-  Clock
+  Clock,
+  Settings
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { MonthProvider, useMonth } from './contexts/MonthContext';
 
-// Pages (to be created)
+// Pages
 import Dashboard from './pages/Dashboard';
 import Contracts from './pages/Contracts';
 import ContractDetails from './pages/ContractDetails';
 import Team from './pages/Team';
 import Financial from './pages/Financial';
+import Home from './pages/Home';
+import SettingsPage from './pages/Settings';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -47,11 +51,25 @@ const NavItem = ({ to, icon: Icon, label, active, onClick }: { to: string, icon:
   </Link>
 );
 
-const Layout = ({ children, user }: { children: React.ReactNode, user: User }) => {
+const CurrentMonthIndicator = () => {
+  const { monthLabel } = useMonth();
+  if (!monthLabel) return null;
+  return (
+    <div className="flex items-center gap-2 bg-zinc-50 px-4 py-2 rounded-2xl border border-zinc-100">
+      <Calendar size={18} className="text-[#c11720]" />
+      <span className="font-bold text-sm text-[#0c3249] capitalize">{monthLabel}</span>
+    </div>
+  );
+};
+import { Calendar, Home as HomeIcon } from 'lucide-react';
+
+const Layout = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { currentMonth } = useMonth();
+  const { user, profile, signOut } = useAuth();
 
-  const handleSignOut = () => signOut(auth);
+  if (!user || !profile) return null;
 
   return (
     <div className="flex flex-col h-screen bg-[#F8F9FA] text-zinc-900 font-sans overflow-hidden">
@@ -69,14 +87,19 @@ const Layout = ({ children, user }: { children: React.ReactNode, user: User }) =
             </div>
 
             <nav className="hidden lg:flex items-center gap-4">
-              <NavItem to="/" icon={LayoutDashboard} label="Dashboard" active={location.pathname === "/"} />
-              <NavItem to="/contratos" icon={FileText} label="Contratos" active={location.pathname.startsWith("/contratos")} />
-              <NavItem to="/team" icon={Users} label="Equipe" active={location.pathname === "/team"} />
-              <NavItem to="/financial" icon={DollarSign} label="Financeiro" active={location.pathname === "/financial"} />
+              <NavItem to="/" icon={HomeIcon} label="Início" active={location.pathname === "/"} />
+              {currentMonth && location.pathname !== "/" && (
+                <>
+                  <NavItem to="/dashboard" icon={LayoutDashboard} label="Dashboard" active={location.pathname === "/dashboard"} />
+                  <NavItem to="/contratos" icon={FileText} label="Contratos" active={location.pathname.startsWith("/contratos")} />
+                  <NavItem to="/team" icon={Users} label="Equipe" active={location.pathname === "/team"} />
+                </>
+              )}
             </nav>
           </div>
 
           <div className="flex items-center gap-10">
+            {location.pathname !== "/" && <CurrentMonthIndicator />}
             <div className="hidden sm:flex items-center gap-5 px-6 py-3 bg-zinc-50 rounded-2xl border border-zinc-100">
               <img 
                 src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}`} 
@@ -85,13 +108,27 @@ const Layout = ({ children, user }: { children: React.ReactNode, user: User }) =
               />
               <div className="text-left">
                 <p className="text-sm font-bold truncate max-w-[250px]">{user.displayName}</p>
-                <p className="text-xs text-zinc-500 truncate max-w-[250px]">{user.email}</p>
+                <p className="text-xs text-zinc-500 truncate max-w-[250px]">{profile.role}</p>
               </div>
             </div>
             
             <div className="flex items-center gap-4">
+              {profile.role === 'ADM' && (
+                <Link 
+                  to="/settings"
+                  className={cn(
+                    "p-4 rounded-2xl transition-all flex items-center gap-3 font-bold text-sm",
+                    location.pathname === '/settings' 
+                      ? "text-[#c11720] bg-red-50" 
+                      : "text-zinc-400 hover:text-[#c11720] hover:bg-red-50"
+                  )}
+                  title="Configurações"
+                >
+                  <Settings size={22} />
+                </Link>
+              )}
               <button 
-                onClick={handleSignOut}
+                onClick={signOut}
                 className="p-4 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-2xl transition-all flex items-center gap-3 font-bold text-sm"
                 title="Sair"
               >
@@ -110,12 +147,19 @@ const Layout = ({ children, user }: { children: React.ReactNode, user: User }) =
       {/* Mobile Menu */}
       {isMobileMenuOpen && (
         <div className="lg:hidden fixed inset-0 bg-white z-40 pt-24 px-6 flex flex-col gap-2">
-          <NavItem to="/" icon={LayoutDashboard} label="Dashboard" active={location.pathname === "/"} onClick={() => setIsMobileMenuOpen(false)} />
-          <NavItem to="/contratos" icon={FileText} label="Contratos" active={location.pathname.startsWith("/contratos")} onClick={() => setIsMobileMenuOpen(false)} />
-          <NavItem to="/team" icon={Users} label="Equipe" active={location.pathname === "/team"} onClick={() => setIsMobileMenuOpen(false)} />
-          <NavItem to="/financial" icon={DollarSign} label="Financeiro" active={location.pathname === "/financial"} onClick={() => setIsMobileMenuOpen(false)} />
+          <NavItem to="/" icon={HomeIcon} label="Início" active={location.pathname === "/"} onClick={() => setIsMobileMenuOpen(false)} />
+          {currentMonth && location.pathname !== "/" && (
+            <>
+              <NavItem to="/dashboard" icon={LayoutDashboard} label="Dashboard" active={location.pathname === "/dashboard"} onClick={() => setIsMobileMenuOpen(false)} />
+              <NavItem to="/contratos" icon={FileText} label="Contratos" active={location.pathname.startsWith("/contratos")} onClick={() => setIsMobileMenuOpen(false)} />
+              <NavItem to="/team" icon={Users} label="Equipe" active={location.pathname === "/team"} onClick={() => setIsMobileMenuOpen(false)} />
+            </>
+          )}
+          {profile.role === 'ADM' && (
+            <NavItem to="/settings" icon={Settings} label="Configurações" active={location.pathname === "/settings"} onClick={() => setIsMobileMenuOpen(false)} />
+          )}
           <hr className="my-4 border-zinc-100" />
-          <button onClick={handleSignOut} className="flex items-center gap-3 px-4 py-3 text-red-600">
+          <button onClick={signOut} className="flex items-center gap-3 px-4 py-3 text-red-600">
             <LogOut size={20} />
             <span>Sair</span>
           </button>
@@ -131,10 +175,7 @@ const Layout = ({ children, user }: { children: React.ReactNode, user: User }) =
 };
 
 const Login = () => {
-  const handleLogin = () => {
-    const provider = new GoogleAuthProvider();
-    signInWithPopup(auth, provider);
-  };
+  const { signInWithGoogle } = useAuth();
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F8F9FA] p-6">
@@ -149,7 +190,7 @@ const Login = () => {
           Gestão profissional de contratos, demandas e rentabilidade para agências e criativos.
         </p>
         <button 
-          onClick={handleLogin}
+          onClick={signInWithGoogle}
           className="w-full flex items-center justify-center gap-3 bg-[#c11720] text-white py-4 rounded-2xl font-semibold hover:bg-red-800 transition-all active:scale-95"
         >
           <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
@@ -163,17 +204,73 @@ const Login = () => {
   );
 };
 
-export default function App() {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+const PendingApproval = () => {
+  const { signOut } = useAuth();
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[#F8F9FA] p-6">
+      <div className="w-full max-w-md bg-white rounded-none shadow-2xl shadow-black/5 p-10 text-center">
+        <div className="w-20 h-20 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center mx-auto mb-6">
+          <Clock size={40} />
+        </div>
+        <h2 className="text-2xl font-bold text-zinc-900 mb-4">Aguardando Aprovação</h2>
+        <p className="text-zinc-500 mb-8 leading-relaxed">
+          Sua conta foi criada com sucesso, mas precisa ser aprovada por um administrador antes que você possa acessar o sistema.
+        </p>
+        <button 
+          onClick={signOut}
+          className="w-full flex items-center justify-center gap-3 bg-zinc-100 text-zinc-700 py-4 rounded-2xl font-semibold hover:bg-zinc-200 transition-all active:scale-95"
+        >
+          <LogOut size={20} />
+          Sair
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const RejectedAccess = () => {
+  const { signOut } = useAuth();
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[#F8F9FA] p-6">
+      <div className="w-full max-w-md bg-white rounded-none shadow-2xl shadow-black/5 p-10 text-center">
+        <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
+          <AlertCircle size={40} />
+        </div>
+        <h2 className="text-2xl font-bold text-zinc-900 mb-4">Acesso Negado</h2>
+        <p className="text-zinc-500 mb-8 leading-relaxed">
+          Infelizmente, seu acesso ao sistema foi negado por um administrador.
+        </p>
+        <button 
+          onClick={signOut}
+          className="w-full flex items-center justify-center gap-3 bg-zinc-100 text-zinc-700 py-4 rounded-2xl font-semibold hover:bg-zinc-200 transition-all active:scale-95"
+        >
+          <LogOut size={20} />
+          Sair
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode, allowedRoles?: string[] }) => {
+  const { currentMonth } = useMonth();
+  const { profile } = useAuth();
+
+  if (!currentMonth) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (allowedRoles && profile && !allowedRoles.includes(profile.role)) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
+};
+
+const AppContent = () => {
+  const { user, profile, loading } = useAuth();
 
   if (loading) {
     return (
@@ -184,18 +281,32 @@ export default function App() {
   }
 
   if (!user) return <Login />;
+  
+  if (profile?.status === 'pending') return <PendingApproval />;
+  if (profile?.status === 'rejected') return <RejectedAccess />;
 
   return (
     <Router>
-      <Layout user={user}>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/contratos" element={<Contracts />} />
-          <Route path="/contratos/:id" element={<ContractDetails />} />
-          <Route path="/team" element={<Team />} />
-          <Route path="/financial" element={<Financial />} />
-        </Routes>
-      </Layout>
+      <MonthProvider>
+        <Layout>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/contratos" element={<ProtectedRoute><Contracts /></ProtectedRoute>} />
+            <Route path="/contratos/:id" element={<ProtectedRoute><ContractDetails /></ProtectedRoute>} />
+            <Route path="/team" element={<ProtectedRoute><Team /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute allowedRoles={['ADM']}><SettingsPage /></ProtectedRoute>} />
+          </Routes>
+        </Layout>
+      </MonthProvider>
     </Router>
+  );
+};
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }

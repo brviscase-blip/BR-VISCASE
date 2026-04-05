@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, onSnapshot, collection, query, where, addDoc, deleteDoc, updateDoc } from 'firebase/firestore';
-import { db } from '../firebase';
-import { Contrato, DemandaContrato, Colaborador, DistribuicaoDemanda, TipoDemanda, PRECOS_DEMANDAS } from '../types';
+import { supabase } from '../supabase';
+import { Contrato, DemandaContrato, Colaborador, DistribuicaoDemanda, TipoDemanda, PRECOS_DEMANDAS, PagamentoMensal, ExecucaoMensal } from '../types';
+import { useMonth } from '../contexts/MonthContext';
 import { 
   ArrowLeft, 
   DollarSign, 
@@ -28,10 +28,13 @@ const ALL_DEMAND_TYPES: TipoDemanda[] = ["Gestão de Conteúdo", "Carrossel", "C
 const ContractDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { currentMonth } = useMonth();
   const [contract, setContract] = useState<Contrato | null>(null);
   const [demandas, setDemandas] = useState<DemandaContrato[]>([]);
   const [distribuicoes, setDistribuicoes] = useState<DistribuicaoDemanda[]>([]);
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
+  const [pagamentoMensal, setPagamentoMensal] = useState<PagamentoMensal | null>(null);
+  const [execucoesMensais, setExecucoesMensais] = useState<ExecucaoMensal[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Form states
@@ -55,54 +58,124 @@ const ContractDetails = () => {
   useEffect(() => {
     if (!id) return;
 
-    const unsubContract = onSnapshot(doc(db, 'contratos', id), async (docSnap) => {
-      if (docSnap.exists()) {
-        const data = { id: docSnap.id, ...docSnap.data() } as Contrato;
-        setContract(data);
+    const fetchData = async () => {
+      const { data: contractData } = await supabase
+        .from('contratos')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (contractData) {
+        setContract(contractData as Contrato);
         
-        let v1 = data.valor_pagamento_1q || 0;
-        let v2 = data.valor_pagamento_2q || 0;
+        let v1 = contractData.valor_pagamento_1q || 0;
+        let v2 = contractData.valor_pagamento_2q || 0;
         
-        // Automatic estimation: if both are 0 and there's a total value, split it
-        const totalValue = data.valor_total_cliente || data.valor_bruto; // Fallback to valor_bruto for older contracts
+        const totalValue = contractData.valor_total_cliente || contractData.valor_bruto;
         if (v1 === 0 && v2 === 0 && totalValue > 0) {
           const estimate = totalValue / 2;
-          await updateDoc(doc(db, 'contratos', id), {
-            valor_pagamento_1q: estimate,
-            valor_pagamento_2q: estimate
-          });
-          // The next snapshot will update the state
-          return;
+          await supabase
+            .from('contratos')
+            .update({
+              valor_pagamento_1q: estimate,
+              valor_pagamento_2q: estimate
+            })
+            .eq('id', id);
         }
-
-        // Initialize local payment values from Firestore
-        setPaymentValues({
-          valor_pagamento_1q: new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2 }).format(v1),
-          valor_pagamento_2q: new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2 }).format(v2)
-        });
       }
-    });
 
-    const unsubDemandas = onSnapshot(query(collection(db, 'demandas_contrato'), where('contrato_id', '==', id)), (snapshot) => {
-      setDemandas(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as DemandaContrato)));
-    });
+      const { data: demandasData } = await supabase
+        .from('demandas_contrato')
+        .select('*')
+        .eq('contrato_id', id);
+      if (demandasData) setDemandas(demandasData as DemandaContrato[]);
 
-    const unsubDist = onSnapshot(query(collection(db, 'distribuicao_demandas'), where('contrato_id', '==', id)), (snapshot) => {
-      setDistribuicoes(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as DistribuicaoDemanda)));
-    });
+      const { data: distsData } = await supabase
+        .from('distribuicao_demandas')
+        .select('*')
+        .eq('contrato_id', id);
+      if (distsData) setDistribuicoes(distsData as DistribuicaoDemanda[]);
 
-    const unsubColabs = onSnapshot(collection(db, 'colaboradores'), (snapshot) => {
-      setColaboradores(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Colaborador)));
+      const { data: colabsData } = await supabase
+        .from('colaboradores')
+        .select('*');
+      if (colabsData) setColaboradores(colabsData as Colaborador[]);
+      
       setLoading(false);
-    });
+    };
+
+    fetchData();
+
+    const contractChannel = supabase.channel('contract_channel')
+      .on('postgres_changes', { event: '*', schema: 'BR_Gestão_de_Contratos', table: 'contratos', filter: `id=eq.${id}` }, fetchData)
+      .subscribe();
+    const demandasChannel = supabase.channel('demandas_channel')
+      .on('postgres_changes', { event: '*', schema: 'BR_Gestão_de_Contratos', table: 'demandas_contrato', filter: `contrato_id=eq.${id}` }, fetchData)
+      .subscribe();
+    const distsChannel = supabase.channel('dists_channel')
+      .on('postgres_changes', { event: '*', schema: 'BR_Gestão_de_Contratos', table: 'distribuicao_demandas', filter: `contrato_id=eq.${id}` }, fetchData)
+      .subscribe();
+    const colabsChannel = supabase.channel('colabs_channel')
+      .on('postgres_changes', { event: '*', schema: 'BR_Gestão_de_Contratos', table: 'colaboradores' }, fetchData)
+      .subscribe();
 
     return () => {
-      unsubContract();
-      unsubDemandas();
-      unsubDist();
-      unsubColabs();
+      supabase.removeChannel(contractChannel);
+      supabase.removeChannel(demandasChannel);
+      supabase.removeChannel(distsChannel);
+      supabase.removeChannel(colabsChannel);
     };
   }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+
+    const fetchPagamentoAndExecucoes = async () => {
+      const { data: pagamentoData } = await supabase
+        .from('pagamentos_mensais')
+        .select('*')
+        .eq('id', `${id}_${currentMonth}`)
+        .single();
+      
+      if (pagamentoData) {
+        const data = pagamentoData as PagamentoMensal;
+        setPagamentoMensal(data);
+        setPaymentValues({
+          valor_pagamento_1q: new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2 }).format(data.valor_pagamento_1q),
+          valor_pagamento_2q: new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2 }).format(data.valor_pagamento_2q)
+        });
+      } else {
+        setPagamentoMensal(null);
+        if (contract) {
+          setPaymentValues({
+            valor_pagamento_1q: new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2 }).format(contract.valor_pagamento_1q || 0),
+            valor_pagamento_2q: new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2 }).format(contract.valor_pagamento_2q || 0)
+          });
+        }
+      }
+
+      const { data: execsData } = await supabase
+        .from('execucoes_mensais')
+        .select('*')
+        .eq('contrato_id', id)
+        .eq('mes_ano', currentMonth);
+      if (execsData) setExecucoesMensais(execsData as ExecucaoMensal[]);
+    };
+
+    fetchPagamentoAndExecucoes();
+
+    const pagamentoChannel = supabase.channel('pagamento_channel')
+      .on('postgres_changes', { event: '*', schema: 'BR_Gestão_de_Contratos', table: 'pagamentos_mensais', filter: `id=eq.${id}_${currentMonth}` }, fetchPagamentoAndExecucoes)
+      .subscribe();
+    const execsChannel = supabase.channel('execs_channel')
+      .on('postgres_changes', { event: '*', schema: 'BR_Gestão_de_Contratos', table: 'execucoes_mensais', filter: `contrato_id=eq.${id}` }, fetchPagamentoAndExecucoes)
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(pagamentoChannel);
+      supabase.removeChannel(execsChannel);
+    };
+  }, [id, currentMonth, contract?.valor_pagamento_1q, contract?.valor_pagamento_2q]);
 
   const handleAddDemanda = async () => {
     if (!id || newDemanda.qtd <= 0) return;
@@ -110,11 +183,13 @@ const ContractDetails = () => {
     setIsAddingDemanda(false);
     setNewDemanda({ tipo: 'Criativo', qtd: 0 });
 
-    await addDoc(collection(db, 'demandas_contrato'), {
-      contrato_id: id,
-      tipo_demanda: dataToSave.tipo,
-      quantidade_total: dataToSave.qtd
-    });
+    await supabase
+      .from('demandas_contrato')
+      .insert({
+        contrato_id: id,
+        tipo_demanda: dataToSave.tipo,
+        quantidade_total: dataToSave.qtd
+      });
   };
 
   const handleUpdateDemanda = async () => {
@@ -166,17 +241,24 @@ const ContractDetails = () => {
 
     // Update or Create main demand
     if (currentDemandaId.startsWith('temp-')) {
-      const docRef = await addDoc(collection(db, 'demandas_contrato'), {
-        contrato_id: id,
-        tipo_demanda: dataToSave.tipo,
-        quantidade_total: dataToSave.qtd
-      });
-      currentDemandaId = docRef.id;
+      const { data: newDemanda } = await supabase
+        .from('demandas_contrato')
+        .insert({
+          contrato_id: id,
+          tipo_demanda: dataToSave.tipo,
+          quantidade_total: dataToSave.qtd
+        })
+        .select()
+        .single();
+      if (newDemanda) currentDemandaId = newDemanda.id;
     } else {
-      await updateDoc(doc(db, 'demandas_contrato', currentDemandaId), {
-        tipo_demanda: dataToSave.tipo,
-        quantidade_total: dataToSave.qtd
-      });
+      await supabase
+        .from('demandas_contrato')
+        .update({
+          tipo_demanda: dataToSave.tipo,
+          quantidade_total: dataToSave.qtd
+        })
+        .eq('id', currentDemandaId);
     }
 
     // Handle distributions
@@ -184,7 +266,10 @@ const ContractDetails = () => {
 
     // 1. Delete removed distributions
     for (const distId of distsToDeleteNow) {
-      await deleteDoc(doc(db, 'distribuicao_demandas', distId));
+      await supabase
+        .from('distribuicao_demandas')
+        .delete()
+        .eq('id', distId);
     }
 
     // 2. Update or Create distributions
@@ -196,23 +281,28 @@ const ContractDetails = () => {
 
       if (dist.id) {
         // Update existing
-        await updateDoc(doc(db, 'distribuicao_demandas', dist.id), {
-          colaborador_id: dist.colabId,
-          quantidade: dist.qtd,
-          tipo_demanda: dataToSave.tipo, // Sync type if changed
-          valor_unitario: finalValorUnit,
-          valor_total: finalValorTotal
-        });
+        await supabase
+          .from('distribuicao_demandas')
+          .update({
+            colaborador_id: dist.colabId,
+            quantidade: dist.qtd,
+            tipo_demanda: dataToSave.tipo, // Sync type if changed
+            valor_unitario: finalValorUnit,
+            valor_total: finalValorTotal
+          })
+          .eq('id', dist.id);
       } else {
         // Create new
-        await addDoc(collection(db, 'distribuicao_demandas'), {
-          contrato_id: id,
-          colaborador_id: dist.colabId,
-          tipo_demanda: dataToSave.tipo,
-          quantidade: dist.qtd,
-          valor_unitario: finalValorUnit,
-          valor_total: finalValorTotal
-        });
+        await supabase
+          .from('distribuicao_demandas')
+          .insert({
+            contrato_id: id,
+            colaborador_id: dist.colabId,
+            tipo_demanda: dataToSave.tipo,
+            quantidade: dist.qtd,
+            valor_unitario: finalValorUnit,
+            valor_total: finalValorTotal
+          });
       }
     }
   };
@@ -231,11 +321,17 @@ const ContractDetails = () => {
     // Delete distributions first
     const distsToDelete = distribuicoes.filter(d => d.tipo_demanda === demandas.find(dem => dem.id === idToDelete)?.tipo_demanda);
     for (const dist of distsToDelete) {
-      await deleteDoc(doc(db, 'distribuicao_demandas', dist.id));
+      await supabase
+        .from('distribuicao_demandas')
+        .delete()
+        .eq('id', dist.id);
     }
 
     // Delete the demand
-    await deleteDoc(doc(db, 'demandas_contrato', idToDelete));
+    await supabase
+      .from('demandas_contrato')
+      .delete()
+      .eq('id', idToDelete);
   };
 
   const handleAddDist = async () => {
@@ -245,26 +341,81 @@ const ContractDetails = () => {
     setNewDist({ colabId: '', tipo: 'Criativo', qtd: 0 });
 
     const valorUnit = PRECOS_DEMANDAS[dataToSave.tipo];
-    await addDoc(collection(db, 'distribuicao_demandas'), {
-      contrato_id: id,
-      colaborador_id: dataToSave.colabId,
-      tipo_demanda: dataToSave.tipo,
-      quantidade: dataToSave.qtd,
-      valor_unitario: valorUnit,
-      valor_total: dataToSave.qtd * valorUnit
-    });
+    await supabase
+      .from('distribuicao_demandas')
+      .insert({
+        contrato_id: id,
+        colaborador_id: dataToSave.colabId,
+        tipo_demanda: dataToSave.tipo,
+        quantidade: dataToSave.qtd,
+        valor_unitario: valorUnit,
+        valor_total: dataToSave.qtd * valorUnit
+      });
   };
 
   const updatePaymentStatus = async (field: 'status_pagamento_1q' | 'status_pagamento_2q', status: string) => {
-    if (!id) return;
-    await updateDoc(doc(db, 'contratos', id), { [field]: status });
+    if (!id || !contract) return;
+    
+    const { data: existing } = await supabase
+      .from('pagamentos_mensais')
+      .select('*')
+      .eq('id', `${id}_${currentMonth}`)
+      .single();
+
+    if (existing) {
+      await supabase
+        .from('pagamentos_mensais')
+        .update({ [field]: status })
+        .eq('id', `${id}_${currentMonth}`);
+    } else {
+      await supabase
+        .from('pagamentos_mensais')
+        .insert({
+          id: `${id}_${currentMonth}`,
+          contrato_id: id,
+          mes_ano: currentMonth,
+          [field]: status,
+          status_pagamento_1q: field === 'status_pagamento_1q' ? status : 'Pendente',
+          status_pagamento_2q: field === 'status_pagamento_2q' ? status : 'Pendente',
+          valor_pagamento_1q: contract.valor_pagamento_1q || 0,
+          valor_pagamento_2q: contract.valor_pagamento_2q || 0,
+          data_pagamento_1q: contract.data_pagamento_1q || '',
+          data_pagamento_2q: contract.data_pagamento_2q || ''
+        });
+    }
   };
 
   const updateDistProgress = async (distId: string, field: 'quantidade_concluida' | 'quantidade_paga', value: string) => {
+    if (!id) return;
     const numValue = parseInt(value) || 0;
-    await updateDoc(doc(db, 'distribuicao_demandas', distId), {
-      [field]: numValue
-    });
+    const dist = distribuicoes.find(d => d.id === distId);
+    if (!dist) return;
+
+    const { data: existing } = await supabase
+      .from('execucoes_mensais')
+      .select('*')
+      .eq('id', `${distId}_${currentMonth}`)
+      .single();
+
+    if (existing) {
+      await supabase
+        .from('execucoes_mensais')
+        .update({ [field]: numValue })
+        .eq('id', `${distId}_${currentMonth}`);
+    } else {
+      await supabase
+        .from('execucoes_mensais')
+        .insert({
+          id: `${distId}_${currentMonth}`,
+          distribuicao_id: distId,
+          contrato_id: id,
+          colaborador_id: dist.colaborador_id,
+          mes_ano: currentMonth,
+          [field]: numValue,
+          quantidade_concluida: field === 'quantidade_concluida' ? numValue : 0,
+          quantidade_paga: field === 'quantidade_paga' ? numValue : 0
+        });
+    }
   };
 
   const updatePaymentValue = async (field: 'valor_pagamento_1q' | 'valor_pagamento_2q') => {
@@ -274,20 +425,46 @@ const ContractDetails = () => {
     
     // Validation: Sum of payments cannot exceed total value
     const otherField = field === 'valor_pagamento_1q' ? 'valor_pagamento_2q' : 'valor_pagamento_1q';
-    const otherValue = Number(contract[otherField] || 0);
+    const otherValue = Number(pagamentoMensal ? pagamentoMensal[otherField] : (contract[otherField] || 0));
     const totalValue = contract.valor_total_cliente || contract.valor_bruto;
     
     if (numValue + otherValue > totalValue) {
       alert(`O valor total das quinzenas (${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(numValue + otherValue)}) não pode exceder o valor total do contrato (${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalValue)}).`);
-      // Reset local value to Firestore value
+      // Reset local value to Supabase value
       setPaymentValues(prev => ({
         ...prev,
-        [field]: new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2 }).format(contract[field] || 0)
+        [field]: new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2 }).format(pagamentoMensal ? pagamentoMensal[field] : (contract[field] || 0))
       }));
       return;
     }
 
-    await updateDoc(doc(db, 'contratos', id), { [field]: numValue });
+    const { data: existing } = await supabase
+      .from('pagamentos_mensais')
+      .select('*')
+      .eq('id', `${id}_${currentMonth}`)
+      .single();
+
+    if (existing) {
+      await supabase
+        .from('pagamentos_mensais')
+        .update({ [field]: numValue })
+        .eq('id', `${id}_${currentMonth}`);
+    } else {
+      await supabase
+        .from('pagamentos_mensais')
+        .insert({
+          id: `${id}_${currentMonth}`,
+          contrato_id: id,
+          mes_ano: currentMonth,
+          [field]: numValue,
+          status_pagamento_1q: 'Pendente',
+          status_pagamento_2q: 'Pendente',
+          valor_pagamento_1q: field === 'valor_pagamento_1q' ? numValue : (contract.valor_pagamento_1q || 0),
+          valor_pagamento_2q: field === 'valor_pagamento_2q' ? numValue : (contract.valor_pagamento_2q || 0),
+          data_pagamento_1q: contract.data_pagamento_1q || '',
+          data_pagamento_2q: contract.data_pagamento_2q || ''
+        });
+    }
   };
 
   const handlePaymentInputChange = (field: string, value: string) => {
@@ -300,7 +477,10 @@ const ContractDetails = () => {
 
   const updateContractStatus = async (status: string) => {
     if (!id) return;
-    await updateDoc(doc(db, 'contratos', id), { status });
+    await supabase
+      .from('contratos')
+      .update({ status })
+      .eq('id', id);
   };
 
   if (loading || !contract) return <div>Carregando...</div>;
@@ -415,8 +595,8 @@ const ContractDetails = () => {
           </h3>
           <div className="space-y-6">
             {[
-              { q: '1ª Quinzena', date: contract.data_pagamento_1q, status: contract.status_pagamento_1q, field: 'status_pagamento_1q', valField: 'valor_pagamento_1q', value: contract.valor_pagamento_1q },
-              { q: '2ª Quinzena', date: contract.data_pagamento_2q, status: contract.status_pagamento_2q, field: 'status_pagamento_2q', valField: 'valor_pagamento_2q', value: contract.valor_pagamento_2q }
+              { q: '1ª Quinzena', date: contract.data_pagamento_1q, status: pagamentoMensal?.status_pagamento_1q || 'Pendente', field: 'status_pagamento_1q', valField: 'valor_pagamento_1q', value: pagamentoMensal?.valor_pagamento_1q || contract.valor_pagamento_1q },
+              { q: '2ª Quinzena', date: contract.data_pagamento_2q, status: pagamentoMensal?.status_pagamento_2q || 'Pendente', field: 'status_pagamento_2q', valField: 'valor_pagamento_2q', value: pagamentoMensal?.valor_pagamento_2q || contract.valor_pagamento_2q }
             ].map((p, i) => (
               <div key={i} className="p-4 bg-zinc-50 rounded-none border border-zinc-100">
                 <div className="flex items-center justify-between mb-3">
@@ -515,8 +695,9 @@ const ContractDetails = () => {
 
                   <div className="border-t border-zinc-200/50 pt-3 space-y-3">
                     {colabDists.map(dist => {
-                      const concluida = dist.quantidade_concluida || 0;
-                      const paga = dist.quantidade_paga || 0;
+                      const execucao = execucoesMensais.find(e => e.distribuicao_id === dist.id);
+                      const concluida = execucao?.quantidade_concluida || 0;
+                      const paga = execucao?.quantidade_paga || 0;
                       const aPagar = (concluida - paga) * dist.valor_unitario;
 
                       return (

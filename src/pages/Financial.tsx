@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, onSnapshot, where } from 'firebase/firestore';
-import { db } from '../firebase';
+import { supabase } from '../supabase';
 import { Contrato, DistribuicaoDemanda, Colaborador } from '../types';
 import { 
   BarChart, 
@@ -16,7 +15,7 @@ import {
   AreaChart,
   Area
 } from 'recharts';
-import { format, parseISO, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths, isWithinInterval } from 'date-fns';
+import { format, parseISO, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths, isWithinInterval, isBefore, isSameMonth, setMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { DollarSign, TrendingUp, TrendingDown, Calendar } from 'lucide-react';
 
@@ -29,44 +28,73 @@ const Financial = () => {
 
   useEffect(() => {
     setIsMounted(true);
-    const unsubContracts = onSnapshot(collection(db, 'contratos'), (snapshot) => {
-      setContracts(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Contrato)));
-    });
+    const fetchData = async () => {
+      const [
+        { data: contracts, error: contractsError },
+        { data: distributions, error: distsError },
+        { data: colaboradores, error: colabsError }
+      ] = await Promise.all([
+        supabase
+          .from('BR_Gestão_de_Contratos.contratos')
+          .select('*'),
+        supabase
+          .from('BR_Gestão_de_Contratos.distribuicao_demandas')
+          .select('*'),
+        supabase
+          .from('BR_Gestão_de_Contratos.colaboradores')
+          .select('*')
+      ]);
 
-    const unsubDist = onSnapshot(collection(db, 'distribuicao_demandas'), (snapshot) => {
-      setDistributions(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as DistribuicaoDemanda)));
-    });
+      if (contractsError) console.error("Error fetching contratos:", contractsError);
+      else setContracts(contracts as Contrato[]);
 
-    const unsubColabs = onSnapshot(collection(db, 'colaboradores'), (snapshot) => {
-      setColaboradores(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Colaborador)));
+      if (distsError) console.error("Error fetching distribuicoes:", distsError);
+      else setDistributions(distributions as DistribuicaoDemanda[]);
+
+      if (colabsError) console.error("Error fetching colaboradores:", colabsError);
+      else setColaboradores(colaboradores as Colaborador[]);
+      
       setLoading(false);
-    });
+    };
+
+    fetchData();
+
+    // Realtime channels
+    const channels = [
+      supabase.channel('contratos-channel').on('postgres_changes', { event: '*', schema: 'BR_Gestão_de_Contratos', table: 'contratos' }, fetchData).subscribe(),
+      supabase.channel('distribuicoes-channel').on('postgres_changes', { event: '*', schema: 'BR_Gestão_de_Contratos', table: 'distribuicao_demandas' }, fetchData).subscribe(),
+      supabase.channel('colaboradores-channel').on('postgres_changes', { event: '*', schema: 'BR_Gestão_de_Contratos', table: 'colaboradores' }, fetchData).subscribe()
+    ];
 
     return () => {
-      unsubContracts();
-      unsubDist();
-      unsubColabs();
+      channels.forEach(ch => supabase.removeChannel(ch));
     };
   }, []);
 
   const getMonthlyData = () => {
-    const last6Months = eachMonthOfInterval({
-      start: subMonths(new Date(), 5),
-      end: new Date()
+    const currentYear = new Date().getFullYear();
+    const monthsOfYear = Array.from({ length: 12 }, (_, i) => {
+      return setMonth(new Date(currentYear, 0, 1), i);
     });
 
-    return last6Months.map(month => {
-      const monthStart = startOfMonth(month);
-      const monthEnd = endOfMonth(month);
+    // Only show months up to the current month or months that have data
+    const today = new Date();
+    const relevantMonths = monthsOfYear.filter(month => {
+      const monthString = format(month, 'yyyy-MM');
+      const hasData = contracts.some(c => c.mes_ano === monthString || (!c.mes_ano && monthString === '2026-04'));
+      return isBefore(month, startOfMonth(today)) || isSameMonth(month, today) || hasData;
+    });
+
+    return relevantMonths.map(month => {
+      const monthString = format(month, 'yyyy-MM');
       
       const monthContracts = contracts.filter(c => {
-        const start = c.created_at ? c.created_at.toDate() : new Date();
-        return isWithinInterval(start, { start: monthStart, end: monthEnd }) || c.status === 'Ativo';
+        return c.mes_ano === monthString || (!c.mes_ano && monthString === '2026-04');
       });
 
       const gross = monthContracts.reduce((acc, c) => acc + (Number(c.valor_bruto) || 0), 0);
       const costs = monthContracts.reduce((acc, c) => {
-        const contractDist = distributions.filter(d => d.contrato_id === c.id);
+        const contractDist = distributions.filter(d => d.contrato_id === c.id && (d.mes_ano === monthString || (!d.mes_ano && monthString === '2026-04')));
         return acc + contractDist.reduce((sum, d) => {
           const colab = colaboradores.find(col => col.id === d.colaborador_id);
           // Exception: "Captação" is always a cost, even for "Proprietário"
@@ -95,12 +123,7 @@ const Financial = () => {
   if (loading) return <div>Carregando...</div>;
 
   return (
-    <div className="space-y-10 animate-fade-in">
-      <header>
-        <h1 className="text-4xl font-bold tracking-tight mb-2 text-[#c11720]">Financeiro</h1>
-        <p className="text-zinc-500">Análise detalhada de receitas, perda aceitável e rentabilidade mensal.</p>
-      </header>
-
+    <div className="space-y-10">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="bg-white p-8 rounded-none border border-zinc-100 shadow-sm">
           <h3 className="text-xl font-bold mb-8 flex items-center gap-2 text-[#c11720]">

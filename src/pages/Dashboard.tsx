@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, query, onSnapshot, where } from 'firebase/firestore';
-import { db } from '../firebase';
-import { Contrato, DistribuicaoDemanda, Colaborador } from '../types';
+import { supabase } from '../supabase';
+import { Contrato, DistribuicaoDemanda, Colaborador, PagamentoMensal, ExecucaoMensal } from '../types';
+import { useMonth } from '../contexts/MonthContext';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -68,9 +68,12 @@ function cn(...inputs: any[]) {
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { currentMonth } = useMonth();
   const [contracts, setContracts] = useState<Contrato[]>([]);
   const [distributions, setDistributions] = useState<DistribuicaoDemanda[]>([]);
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
+  const [pagamentosMensais, setPagamentosMensais] = useState<PagamentoMensal[]>([]);
+  const [execucoesMensais, setExecucoesMensais] = useState<ExecucaoMensal[]>([]);
   const [loading, setLoading] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
   const [showAtRiskModal, setShowAtRiskModal] = useState(false);
@@ -78,30 +81,82 @@ const Dashboard = () => {
 
   useEffect(() => {
     setIsMounted(true);
-    const q = query(collection(db, 'contratos'), where('status', '==', 'Ativo'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Contrato));
-      setContracts(data);
-    });
+    const fetchData = async () => {
+      const [
+        { data: contracts, error: contractsError },
+        { data: distributions, error: distsError },
+        { data: colaboradores, error: colabsError }
+      ] = await Promise.all([
+        supabase
+          .from('BR_Gestão_de_Contratos.contratos')
+          .select('*')
+          .eq('status', 'Ativo'),
+        supabase
+          .from('BR_Gestão_de_Contratos.distribuicao_demandas')
+          .select('*'),
+        supabase
+          .from('BR_Gestão_de_Contratos.colaboradores')
+          .select('*')
+      ]);
 
-    const qDist = query(collection(db, 'distribuicao_demandas'));
-    const unsubscribeDist = onSnapshot(qDist, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DistribuicaoDemanda));
-      setDistributions(data);
-    });
+      if (contractsError) console.error("Error fetching contratos:", contractsError);
+      else setContracts((contracts as Contrato[]).filter(c => c.mes_ano === currentMonth || (!c.mes_ano && currentMonth === '2026-04')));
 
-    const unsubscribeColabs = onSnapshot(collection(db, 'colaboradores'), (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Colaborador));
-      setColaboradores(data);
+      if (distsError) console.error("Error fetching distribuicoes:", distsError);
+      else setDistributions((distributions as DistribuicaoDemanda[]).filter(d => d.mes_ano === currentMonth || (!d.mes_ano && currentMonth === '2026-04')));
+
+      if (colabsError) console.error("Error fetching colaboradores:", colabsError);
+      else setColaboradores(colaboradores as Colaborador[]);
+      
       setLoading(false);
-    });
+    };
+
+    fetchData();
+
+    // Realtime channels
+    const channels = [
+      supabase.channel('contratos-channel').on('postgres_changes', { event: '*', schema: 'BR_Gestão_de_Contratos', table: 'contratos' }, fetchData).subscribe(),
+      supabase.channel('distribuicoes-channel').on('postgres_changes', { event: '*', schema: 'BR_Gestão_de_Contratos', table: 'distribuicao_demandas' }, fetchData).subscribe(),
+      supabase.channel('colaboradores-channel').on('postgres_changes', { event: '*', schema: 'BR_Gestão_de_Contratos', table: 'colaboradores' }, fetchData).subscribe()
+    ];
 
     return () => {
-      unsubscribe();
-      unsubscribeDist();
-      unsubscribeColabs();
+      channels.forEach(ch => supabase.removeChannel(ch));
     };
-  }, []);
+  }, [currentMonth]);
+
+  useEffect(() => {
+    const fetchPagamentos = async () => {
+      const { data } = await supabase
+        .from('pagamentos_mensais')
+        .select('*')
+        .eq('mes_ano', currentMonth);
+      if (data) setPagamentosMensais(data as PagamentoMensal[]);
+    };
+    fetchPagamentos();
+    const channelPagamentos = supabase
+      .channel('pagamentos-changes')
+      .on('postgres_changes', { event: '*', schema: 'BR_Gestão_de_Contratos', table: 'pagamentos_mensais' }, fetchPagamentos)
+      .subscribe();
+
+    const fetchExecucoes = async () => {
+      const { data } = await supabase
+        .from('execucoes_mensais')
+        .select('*')
+        .eq('mes_ano', currentMonth);
+      if (data) setExecucoesMensais(data as ExecucaoMensal[]);
+    };
+    fetchExecucoes();
+    const channelExecucoes = supabase
+      .channel('execucoes-changes')
+      .on('postgres_changes', { event: '*', schema: 'BR_Gestão_de_Contratos', table: 'execucoes_mensais' }, fetchExecucoes)
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channelPagamentos);
+      supabase.removeChannel(channelExecucoes);
+    };
+  }, [currentMonth]);
 
   const calculateStats = () => {
     const totalGross = contracts.reduce((acc, c) => acc + (Number(c.valor_bruto) || 0), 0);

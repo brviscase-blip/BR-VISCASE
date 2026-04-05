@@ -1,4 +1,15 @@
-import { Timestamp } from 'firebase/firestore';
+
+export type UserRole = "ADM" | "Parceiro" | "Equipe";
+export type UserStatus = "pending" | "active" | "rejected";
+
+export interface UserProfile {
+  id: string; // Firebase Auth UID
+  email: string;
+  name: string;
+  role: UserRole;
+  status: UserStatus;
+  created_at?: string;
+}
 
 export type Pacote = 
   | "Starter Master Acessível"
@@ -29,7 +40,8 @@ export interface Contrato {
   valor_pagamento_1q?: number;
   valor_pagamento_2q?: number;
   uid: string;
-  created_at?: Timestamp;
+  created_at?: string;
+  mes_ano?: string; // Format: 'YYYY-MM'
 }
 
 export interface DemandaContrato {
@@ -37,6 +49,7 @@ export interface DemandaContrato {
   contrato_id: string;
   tipo_demanda: TipoDemanda;
   quantidade_total: number;
+  mes_ano?: string; // Format: 'YYYY-MM'
 }
 
 export interface Colaborador {
@@ -55,8 +68,31 @@ export interface DistribuicaoDemanda {
   quantidade: number;
   valor_unitario: number;
   valor_total: number;
-  quantidade_concluida?: number;
-  quantidade_paga?: number;
+  quantidade_concluida?: number; // Deprecated: use ExecucaoMensal
+  quantidade_paga?: number; // Deprecated: use ExecucaoMensal
+  mes_ano?: string; // Format: 'YYYY-MM'
+}
+
+export interface PagamentoMensal {
+  id?: string;
+  contrato_id: string;
+  mes_ano: string;
+  status_pagamento_1q: StatusPagamento;
+  status_pagamento_2q: StatusPagamento;
+  valor_pagamento_1q: number;
+  valor_pagamento_2q: number;
+  data_pagamento_1q: string;
+  data_pagamento_2q: string;
+}
+
+export interface ExecucaoMensal {
+  id?: string;
+  distribuicao_id: string;
+  contrato_id: string;
+  colaborador_id: string;
+  mes_ano: string;
+  quantidade_concluida: number;
+  quantidade_paga: number;
 }
 
 export const PRECOS_DEMANDAS: Record<TipoDemanda, number> = {

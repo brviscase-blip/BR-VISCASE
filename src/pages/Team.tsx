@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, addDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
-import { db, auth } from '../firebase';
-import { Colaborador, TipoColaborador, DistribuicaoDemanda } from '../types';
+import { supabase } from '../supabase';
+import { Colaborador, TipoColaborador, DistribuicaoDemanda, ExecucaoMensal } from '../types';
+import { useMonth } from '../contexts/MonthContext';
 import { Plus, Trash2, Users, UserPlus, Briefcase, User as UserIcon, AlertCircle, Handshake, CheckCircle2 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -11,45 +11,83 @@ function cn(...inputs: ClassValue[]) {
 }
 
 const Team = () => {
+  const { currentMonth } = useMonth();
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [distribuicoes, setDistribuicoes] = useState<DistribuicaoDemanda[]>([]);
+  const [execucoesMensais, setExecucoesMensais] = useState<ExecucaoMensal[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [colabToDelete, setColabToDelete] = useState<string | null>(null);
   const [formData, setFormData] = useState({ nome: '', tipo: 'Equipe' as TipoColaborador, salario: 0 });
 
   useEffect(() => {
-    const unsubColabs = onSnapshot(collection(db, 'colaboradores'), (snapshot) => {
-      setColaboradores(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Colaborador)));
-    }, (error) => {
-      console.error("Erro ao carregar colaboradores:", error);
-    });
-    const unsubDists = onSnapshot(collection(db, 'distribuicao_demandas'), (snapshot) => {
-      setDistribuicoes(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as DistribuicaoDemanda)));
-    }, (error) => {
-      console.error("Erro ao carregar distribuições:", error);
-    });
-    return () => {
-      unsubColabs();
-      unsubDists();
+    const fetchData = async () => {
+      const { data: colabs } = await supabase
+        .from('colaboradores')
+        .select('*');
+      if (colabs) setColaboradores(colabs as Colaborador[]);
+
+      const { data: dists } = await supabase
+        .from('distribuicao_demandas')
+        .select('*');
+      if (dists) {
+        const filteredDists = dists.filter(d => d.mes_ano === currentMonth || (!d.mes_ano && currentMonth === '2026-04'));
+        setDistribuicoes(filteredDists as DistribuicaoDemanda[]);
+      }
     };
-  }, []);
+
+    fetchData();
+
+    const colabsChannel = supabase.channel('colaboradores_channel')
+      .on('postgres_changes', { event: '*', schema: 'BR_Gestão_de_Contratos', table: 'colaboradores' }, fetchData)
+      .subscribe();
+    const distsChannel = supabase.channel('distribuicao_channel')
+      .on('postgres_changes', { event: '*', schema: 'BR_Gestão_de_Contratos', table: 'distribuicao_demandas' }, fetchData)
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(colabsChannel);
+      supabase.removeChannel(distsChannel);
+    };
+  }, [currentMonth]);
+
+  useEffect(() => {
+    const fetchExecucoes = async () => {
+      const { data: execs } = await supabase
+        .from('execucoes_mensais')
+        .select('*')
+        .eq('mes_ano', currentMonth);
+      if (execs) setExecucoesMensais(execs as ExecucaoMensal[]);
+    };
+
+    fetchExecucoes();
+
+    const execChannel = supabase.channel('execucoes_channel')
+      .on('postgres_changes', { event: '*', schema: 'BR_Gestão_de_Contratos', table: 'execucoes_mensais' }, fetchExecucoes)
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(execChannel);
+    };
+  }, [currentMonth]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!auth.currentUser) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
     
     const dataToSave = { ...formData };
     setIsModalOpen(false);
     setFormData({ nome: '', tipo: 'Equipe', salario: 0 });
 
-    await addDoc(collection(db, 'colaboradores'), {
-      nome: dataToSave.nome,
-      tipo: dataToSave.tipo,
-      salario_fixo: dataToSave.salario,
-      uid: auth.currentUser.uid,
-      created_at: serverTimestamp()
-    });
+    await supabase
+      .from('colaboradores')
+      .insert({
+        nome: dataToSave.nome,
+        tipo: dataToSave.tipo,
+        salario_fixo: dataToSave.salario,
+        uid: user.id
+      });
   };
 
   const handleDelete = async () => {
@@ -59,7 +97,10 @@ const Team = () => {
     setColabToDelete(null);
 
     try {
-      await deleteDoc(doc(db, 'colaboradores', idToDelete));
+      await supabase
+        .from('colaboradores')
+        .delete()
+        .eq('id', idToDelete);
     } catch (error) {
       console.error("Erro ao excluir colaborador:", error);
     }
@@ -71,12 +112,21 @@ const Team = () => {
   const collaboratorsWithStats = colaboradores.map(colab => {
     const colabDists = distribuicoes.filter(d => d.colaborador_id === colab.id);
     const totalDemands = colabDists.reduce((acc, d) => acc + (d.quantidade || 0), 0);
-    const completedDemands = colabDists.reduce((acc, d) => acc + (d.quantidade_concluida || 0), 0);
-    const paidDemands = colabDists.reduce((acc, d) => acc + (d.quantidade_paga || 0), 0);
+    
+    const completedDemands = colabDists.reduce((acc, d) => {
+      const exec = execucoesMensais.find(e => e.distribuicao_id === d.id);
+      return acc + (exec?.quantidade_concluida || 0);
+    }, 0);
+    
+    const paidDemands = colabDists.reduce((acc, d) => {
+      const exec = execucoesMensais.find(e => e.distribuicao_id === d.id);
+      return acc + (exec?.quantidade_paga || 0);
+    }, 0);
     
     const aPagarValue = colabDists.reduce((acc, d) => {
-      const concluida = d.quantidade_concluida || 0;
-      const paga = d.quantidade_paga || 0;
+      const exec = execucoesMensais.find(e => e.distribuicao_id === d.id);
+      const concluida = exec?.quantidade_concluida || 0;
+      const paga = exec?.quantidade_paga || 0;
       return acc + ((concluida - paga) * (d.valor_unitario || 0));
     }, 0);
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, updateDoc } from 'firebase/firestore';
-import { db, auth } from '../firebase';
-import { Contrato, Pacote, StatusContrato, StatusPagamento, DemandaContrato, DistribuicaoDemanda, Colaborador } from '../types';
+import { supabase } from '../supabase';
+import { Contrato, Pacote, StatusContrato, StatusPagamento, DemandaContrato, DistribuicaoDemanda, Colaborador, PagamentoMensal, ExecucaoMensal } from '../types';
+import { useMonth } from '../contexts/MonthContext';
 import { 
   Plus, 
   Search, 
@@ -30,6 +30,7 @@ const StatusBadge = ({ status }: { status: string }) => {
     "Pago": "bg-emerald-50 text-emerald-700 border-emerald-100",
     "Pendente": "bg-amber-50 text-amber-700 border-amber-100",
     "Atrasado": "bg-rose-50 text-rose-700 border-rose-100",
+    "Parcial": "bg-indigo-50 text-indigo-700 border-indigo-100",
   };
 
   return (
@@ -47,10 +48,13 @@ function cn(...inputs: any[]) {
 }
 
 const Contracts = () => {
+  const { currentMonth } = useMonth();
   const [contracts, setContracts] = useState<Contrato[]>([]);
   const [demandas, setDemandas] = useState<DemandaContrato[]>([]);
   const [distribuicoes, setDistribuicoes] = useState<DistribuicaoDemanda[]>([]);
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
+  const [pagamentosMensais, setPagamentosMensais] = useState<PagamentoMensal[]>([]);
+  const [execucoesMensais, setExecucoesMensais] = useState<ExecucaoMensal[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -72,68 +76,165 @@ const Contracts = () => {
   });
 
   useEffect(() => {
-    const q = query(collection(db, 'contratos'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => {
-        const d = doc.data() as Contrato;
-        // Auto-calculate status based on dates
-        let status1 = d.status_pagamento_1q;
-        let status2 = d.status_pagamento_2q;
-        const today = new Date();
-
-        if (d.data_pagamento_1q && isAfter(today, parseISO(d.data_pagamento_1q)) && status1 === 'Pendente') {
-          status1 = 'Atrasado';
-        }
-        if (d.data_pagamento_2q && isAfter(today, parseISO(d.data_pagamento_2q)) && status2 === 'Pendente') {
-          status2 = 'Atrasado';
-        }
-
-        return { 
-          id: doc.id, 
-          ...d,
-          status_pagamento_1q: status1,
-          status_pagamento_2q: status2
-        } as Contrato;
-      });
-      setContracts(data);
+    const fetchContracts = async () => {
+      const { data, error } = await supabase
+        .from('BR_Gestão_de_Contratos.contratos')
+        .select('*');
+      
+      if (error) {
+        console.error("Error fetching contratos:", error);
+      } else {
+        const filtered = (data as Contrato[]).filter(c => c.mes_ano === currentMonth || (!c.mes_ano && currentMonth === '2026-04'));
+        setContracts(filtered);
+      }
       setLoading(false);
-    });
+    };
+    
+    fetchContracts();
 
-    return () => unsubscribe();
+    const channel = supabase.channel('contratos-channel')
+      .on('postgres_changes', { event: '*', schema: 'BR_Gestão_de_Contratos', table: 'contratos' }, () => {
+        fetchContracts();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentMonth]);
+
+  useEffect(() => {
+    const fetchDemandas = async () => {
+      const { data, error } = await supabase
+        .from('BR_Gestão_de_Contratos.demandas')
+        .select('*');
+      
+      if (error) {
+        console.error("Error fetching demandas:", error);
+      } else {
+        const filtered = (data as DemandaContrato[]).filter(d => d.mes_ano === currentMonth || (!d.mes_ano && currentMonth === '2026-04'));
+        setDemandas(filtered);
+      }
+    };
+    
+    fetchDemandas();
+
+    const channel = supabase.channel('demandas-channel')
+      .on('postgres_changes', { event: '*', schema: 'BR_Gestão_de_Contratos', table: 'demandas' }, () => {
+        fetchDemandas();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentMonth]);
+
+  useEffect(() => {
+    const fetchDistribuicoes = async () => {
+      const { data, error } = await supabase
+        .from('BR_Gestão_de_Contratos.distribuicao_demandas')
+        .select('*');
+      
+      if (error) {
+        console.error("Error fetching distribuicoes:", error);
+      } else {
+        const filtered = (data as DistribuicaoDemanda[]).filter(d => d.mes_ano === currentMonth || (!d.mes_ano && currentMonth === '2026-04'));
+        setDistribuicoes(filtered);
+      }
+    };
+    
+    fetchDistribuicoes();
+
+    const channel = supabase.channel('distribuicoes-channel')
+      .on('postgres_changes', { event: '*', schema: 'BR_Gestão_de_Contratos', table: 'distribuicao_demandas' }, () => {
+        fetchDistribuicoes();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentMonth]);
+
+  useEffect(() => {
+    const fetchColaboradores = async () => {
+      const { data, error } = await supabase
+        .from('BR_Gestão_de_Contratos.colaboradores')
+        .select('*');
+      
+      if (error) {
+        console.error("Error fetching colaboradores:", error);
+      } else {
+        setColaboradores(data as Colaborador[]);
+      }
+    };
+    
+    fetchColaboradores();
+
+    const channel = supabase.channel('colaboradores-channel')
+      .on('postgres_changes', { event: '*', schema: 'BR_Gestão_de_Contratos', table: 'colaboradores' }, () => {
+        fetchColaboradores();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   useEffect(() => {
-    const q = query(collection(db, 'demandas_contrato'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DemandaContrato));
-      setDemandas(data);
-    });
-    return () => unsubscribe();
-  }, []);
+    const fetchPagamentosExecucoes = async () => {
+      const [
+        { data: pagamentos, error: pagamentosError },
+        { data: execucoes, error: execucoesError }
+      ] = await Promise.all([
+        supabase
+          .from('BR_Gestão_de_Contratos.pagamentos_mensais')
+          .select('*')
+          .eq('mes_ano', currentMonth),
+        supabase
+          .from('BR_Gestão_de_Contratos.execucoes_mensais')
+          .select('*')
+          .eq('mes_ano', currentMonth)
+      ]);
 
-  useEffect(() => {
-    const q = query(collection(db, 'distribuicao_demandas'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DistribuicaoDemanda));
-      setDistribuicoes(data);
-    });
-    return () => unsubscribe();
-  }, []);
+      if (pagamentosError) console.error("Error fetching pagamentos:", pagamentosError);
+      else setPagamentosMensais(pagamentos as PagamentoMensal[]);
 
-  useEffect(() => {
-    const q = query(collection(db, 'colaboradores'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Colaborador));
-      setColaboradores(data);
-    });
-    return () => unsubscribe();
-  }, []);
+      if (execucoesError) console.error("Error fetching execucoes:", execucoesError);
+      else setExecucoesMensais(execucoes as ExecucaoMensal[]);
+    };
+
+    fetchPagamentosExecucoes();
+
+    const channelPagamentos = supabase.channel('pagamentos-channel')
+      .on('postgres_changes', { event: '*', schema: 'BR_Gestão_de_Contratos', table: 'pagamentos_mensais' }, () => {
+        fetchPagamentosExecucoes();
+      })
+      .subscribe();
+      
+    const channelExecucoes = supabase.channel('execucoes-channel')
+      .on('postgres_changes', { event: '*', schema: 'BR_Gestão_de_Contratos', table: 'execucoes_mensais' }, () => {
+        fetchPagamentosExecucoes();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channelPagamentos);
+      supabase.removeChannel(channelExecucoes);
+    };
+  }, [currentMonth]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!auth.currentUser) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
 
-    const dataToSave = { ...formData };
+    const dataToSave = { 
+      ...formData,
+      mes_ano: currentMonth
+    };
     setIsModalOpen(false);
     setFormData({
       nome: '',
@@ -151,22 +252,25 @@ const Contracts = () => {
     const valorTotalCliente = dataToSave.tem_parceria ? (dataToSave.valor_bruto + dataToSave.valor_parceiro) : dataToSave.valor_total_cliente;
 
     try {
-      await addDoc(collection(db, 'contratos'), {
-        nome: dataToSave.nome,
-        pacote: dataToSave.pacote,
-        valor_total_cliente: valorTotalCliente,
-        tem_parceria: dataToSave.tem_parceria,
-        parceiro_id: dataToSave.tem_parceria ? dataToSave.parceiro_id : null,
-        valor_parceiro: dataToSave.tem_parceria ? dataToSave.valor_parceiro : 0,
-        valor_bruto: valorBruto,
-        data_pagamento_1q: dataToSave.data_pagamento_1q,
-        data_pagamento_2q: dataToSave.data_pagamento_2q,
-        status: 'Ativo',
-        status_pagamento_1q: 'Pendente',
-        status_pagamento_2q: 'Pendente',
-        uid: auth.currentUser.uid,
-        created_at: serverTimestamp()
-      });
+      const { error } = await supabase
+        .from('BR_Gestão_de_Contratos.contratos')
+        .insert({
+          nome: dataToSave.nome,
+          pacote: dataToSave.pacote,
+          valor_total_cliente: valorTotalCliente,
+          tem_parceria: dataToSave.tem_parceria,
+          parceiro_id: dataToSave.tem_parceria ? dataToSave.parceiro_id : null,
+          valor_parceiro: dataToSave.tem_parceria ? dataToSave.valor_parceiro : 0,
+          valor_bruto: valorBruto,
+          data_pagamento_1q: dataToSave.data_pagamento_1q,
+          data_pagamento_2q: dataToSave.data_pagamento_2q,
+          status: 'Ativo',
+          status_pagamento_1q: 'Pendente',
+          status_pagamento_2q: 'Pendente',
+          uid: user.id,
+          mes_ano: currentMonth
+        });
+      if (error) throw error;
     } catch (error) {
       console.error("Erro ao criar contrato:", error);
     }
@@ -179,10 +283,42 @@ const Contracts = () => {
     setContractToDelete(null);
 
     try {
-      await deleteDoc(doc(db, 'contratos', idToDelete));
+      const { error } = await supabase
+        .from('BR_Gestão_de_Contratos.contratos')
+        .delete()
+        .eq('id', idToDelete);
+      if (error) throw error;
     } catch (error) {
       console.error("Erro ao excluir contrato:", error);
     }
+  };
+
+  const getContractStatus = (contract: Contrato) => {
+    const pagamentos = pagamentosMensais.find(p => p.contrato_id === contract.id);
+    const status1q = pagamentos?.status_pagamento_1q || contract.status_pagamento_1q || 'Pendente';
+    const status2q = pagamentos?.status_pagamento_2q || contract.status_pagamento_2q || 'Pendente';
+    
+    if (status1q === 'Pago' && status2q === 'Pago') {
+      return 'Pago';
+    } else if (status1q === 'Atrasado' || status2q === 'Atrasado') {
+      return 'Atrasado';
+    } else if (status1q === 'Pago' || status2q === 'Pago') {
+      return 'Parcial';
+    }
+    return 'Pendente';
+  };
+
+  const getContractProgress = (contractId: string) => {
+    const dists = distribuicoes.filter(d => d.contrato_id === contractId);
+    if (dists.length === 0) return 0;
+    
+    const totalDemandas = dists.reduce((acc, d) => acc + (d.quantidade || 0), 0);
+    const totalConcluidas = dists.reduce((acc, d) => {
+      const exec = execucoesMensais.find(e => e.distribuicao_id === d.id);
+      return acc + (exec?.quantidade_concluida || 0);
+    }, 0);
+    
+    return totalDemandas > 0 ? (totalConcluidas / totalDemandas) * 100 : 0;
   };
 
   const filteredContracts = contracts.filter(c => 
@@ -292,16 +428,24 @@ const Contracts = () => {
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] font-bold text-zinc-400 uppercase">1ªQ:</span>
-                          <StatusBadge status={contract.status_pagamento_1q} />
+                          <StatusBadge status={pagamentosMensais.find(p => p.contrato_id === contract.id)?.status_pagamento_1q || contract.status_pagamento_1q || 'Pendente'} />
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-[10px] font-bold text-zinc-400 uppercase">2ªQ:</span>
-                          <StatusBadge status={contract.status_pagamento_2q} />
+                          <StatusBadge status={pagamentosMensais.find(p => p.contrato_id === contract.id)?.status_pagamento_2q || contract.status_pagamento_2q || 'Pendente'} />
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-5">
-                      <StatusBadge status={contract.status} />
+                      <div className="flex flex-col gap-2">
+                        <StatusBadge status={getContractStatus(contract)} />
+                        <div className="w-full bg-zinc-100 rounded-full h-1.5">
+                          <div 
+                            className="bg-[#c11720] h-1.5 rounded-full transition-all" 
+                            style={{ width: `${getContractProgress(contract.id)}%` }}
+                          />
+                        </div>
+                      </div>
                     </td>
                     <td className="px-6 py-5 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-2">

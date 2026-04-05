@@ -54,12 +54,40 @@
         "valor_total": { "type": "number", "description": "Valor total da distribuição" }
       },
       "required": ["contrato_id", "colaborador_id", "tipo_demanda", "quantidade", "valor_unitario", "valor_total"]
+    },
+    "pagamento_mensal": {
+      "title": "Pagamento Mensal",
+      "description": "Registro de status de pagamento por mês para um contrato.",
+      "type": "object",
+      "properties": {
+        "contrato_id": { "type": "string", "description": "ID do contrato" },
+        "mes_ano": { "type": "string", "description": "Mês e ano do registro (ex: 2026-04)" },
+        "status_pagamento_1q": { "type": "string", "enum": ["Pendente", "Pago", "Atrasado"], "description": "Status 1ª quinzena" },
+        "status_pagamento_2q": { "type": "string", "enum": ["Pendente", "Pago", "Atrasado"], "description": "Status 2ª quinzena" },
+        "valor_pago_1q": { "type": "number", "description": "Valor pago na 1ª quinzena" },
+        "valor_pago_2q": { "type": "number", "description": "Valor pago na 2ª quinzena" }
+      },
+      "required": ["contrato_id", "mes_ano"]
+    },
+    "execucao_mensal": {
+      "title": "Execução Mensal",
+      "description": "Registro de execução de demandas por colaborador por mês.",
+      "type": "object",
+      "properties": {
+        "distribuicao_id": { "type": "string", "description": "ID da distribuição de demanda" },
+        "mes_ano": { "type": "string", "description": "Mês e ano do registro (ex: 2026-04)" },
+        "quantidade_concluida": { "type": "integer", "description": "Quantidade concluída no mês" },
+        "quantidade_paga": { "type": "integer", "description": "Quantidade paga no mês" }
+      },
+      "required": ["distribuicao_id", "mes_ano"]
     }
   },
   "firestore": {
     "/contratos/{contratoId}": { "schema": "contrato", "description": "Coleção de contratos" },
     "/demandas_contrato/{demandaId}": { "schema": "demanda", "description": "Demandas por contrato" },
     "/colaboradores/{colaboradorId}": { "schema": "colaborador", "description": "Coleção de colaboradores" },
-    "/distribuicao_demandas/{distribuicaoId}": { "schema": "distribuicao", "description": "Distribuição de demandas" }
+    "/distribuicao_demandas/{distribuicaoId}": { "schema": "distribuicao", "description": "Distribuição de demandas" },
+    "/pagamentos_mensais/{pagamentoId}": { "schema": "pagamento_mensal", "description": "Pagamentos mensais de contratos" },
+    "/execucoes_mensais/{execucaoId}": { "schema": "execucao_mensal", "description": "Execuções mensais de demandas" }
   }
 }
